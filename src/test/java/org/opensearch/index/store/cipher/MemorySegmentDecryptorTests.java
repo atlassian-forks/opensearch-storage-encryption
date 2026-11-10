@@ -10,7 +10,9 @@ import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.nio.charset.StandardCharsets;
+import java.security.Provider;
 import java.security.SecureRandom;
+import java.security.Security;
 import java.util.Arrays;
 
 import javax.crypto.Cipher;
@@ -27,6 +29,7 @@ public class MemorySegmentDecryptorTests extends OpenSearchTestCase {
     private static final byte[] TEST_KEY = new byte[32]; // 256-bit AES key
     private static final byte[] TEST_IV = new byte[16];  // 128-bit IV
     private static final byte[] TEST_DATA = "Hello World Test Data for Encryption!".getBytes(StandardCharsets.UTF_8);
+    private static final Provider SUN_JCE = Security.getProvider("SunJCE");
 
     private Arena arena;
 
@@ -51,7 +54,7 @@ public class MemorySegmentDecryptorTests extends OpenSearchTestCase {
 
     public void testDecryptInPlaceWithArena() throws Exception {
         // Encrypt test data first
-        Cipher cipher = AesCipherFactory.CIPHER_POOL.get();
+        Cipher cipher = AesCipherFactory.getPooledCipher(SUN_JCE);
         SecretKeySpec keySpec = new SecretKeySpec(TEST_KEY, "AES");
         byte[] offsetIV = AesCipherFactory.computeOffsetIVForAesGcmEncrypted(TEST_IV, 0);
         cipher.init(Cipher.ENCRYPT_MODE, keySpec, new IvParameterSpec(offsetIV));
@@ -64,7 +67,7 @@ public class MemorySegmentDecryptorTests extends OpenSearchTestCase {
         }
 
         // Decrypt in place
-        MemorySegmentDecryptor.decryptInPlace(arena, segment.address(), encrypted.length, TEST_KEY, TEST_IV, 0);
+        MemorySegmentDecryptor.decryptInPlace(arena, segment.address(), encrypted.length, TEST_KEY, TEST_IV, 0, SUN_JCE);
 
         // Verify decrypted data
         byte[] decrypted = new byte[TEST_DATA.length];
@@ -77,7 +80,7 @@ public class MemorySegmentDecryptorTests extends OpenSearchTestCase {
 
     public void testDecryptInPlaceWithGlobalScope() throws Exception {
         // Encrypt test data first
-        Cipher cipher = AesCipherFactory.CIPHER_POOL.get();
+        Cipher cipher = AesCipherFactory.getPooledCipher(SUN_JCE);
         SecretKeySpec keySpec = new SecretKeySpec(TEST_KEY, "AES");
         byte[] offsetIV = AesCipherFactory.computeOffsetIVForAesGcmEncrypted(TEST_IV, 0);
         cipher.init(Cipher.ENCRYPT_MODE, keySpec, new IvParameterSpec(offsetIV));
@@ -90,7 +93,7 @@ public class MemorySegmentDecryptorTests extends OpenSearchTestCase {
         }
 
         // Decrypt in place using global scope
-        MemorySegmentDecryptor.decryptInPlace(segment.address(), encrypted.length, TEST_KEY, TEST_IV, 0);
+        MemorySegmentDecryptor.decryptInPlace(segment.address(), encrypted.length, TEST_KEY, TEST_IV, 0, SUN_JCE);
 
         // Verify decrypted data
         byte[] decrypted = new byte[TEST_DATA.length];
@@ -103,7 +106,7 @@ public class MemorySegmentDecryptorTests extends OpenSearchTestCase {
 
     public void testDecryptSegment() throws Exception {
         // Encrypt test data first
-        Cipher cipher = AesCipherFactory.CIPHER_POOL.get();
+        Cipher cipher = AesCipherFactory.getPooledCipher(SUN_JCE);
         SecretKeySpec keySpec = new SecretKeySpec(TEST_KEY, "AES");
         byte[] offsetIV = AesCipherFactory.computeOffsetIVForAesGcmEncrypted(TEST_IV, 0);
         cipher.init(Cipher.ENCRYPT_MODE, keySpec, new IvParameterSpec(offsetIV));
@@ -116,7 +119,7 @@ public class MemorySegmentDecryptorTests extends OpenSearchTestCase {
         }
 
         // Decrypt segment
-        MemorySegmentDecryptor.decryptSegment(segment, 0, TEST_KEY, TEST_IV, encrypted.length);
+        MemorySegmentDecryptor.decryptSegment(segment, 0, TEST_KEY, TEST_IV, encrypted.length, SUN_JCE);
 
         // Verify decrypted data
         byte[] decrypted = new byte[TEST_DATA.length];
@@ -131,7 +134,7 @@ public class MemorySegmentDecryptorTests extends OpenSearchTestCase {
         long fileOffset = 1024;
 
         // Encrypt test data with offset-aware IV
-        Cipher cipher = AesCipherFactory.CIPHER_POOL.get();
+        Cipher cipher = AesCipherFactory.getPooledCipher(SUN_JCE);
         SecretKeySpec keySpec = new SecretKeySpec(TEST_KEY, "AES");
         byte[] offsetIV = AesCipherFactory.computeOffsetIVForAesGcmEncrypted(TEST_IV, fileOffset);
         cipher.init(Cipher.ENCRYPT_MODE, keySpec, new IvParameterSpec(offsetIV));
@@ -151,7 +154,7 @@ public class MemorySegmentDecryptorTests extends OpenSearchTestCase {
         }
 
         // Decrypt with file offset
-        MemorySegmentDecryptor.decryptInPlace(arena, segment.address(), encrypted.length, TEST_KEY, TEST_IV, fileOffset);
+        MemorySegmentDecryptor.decryptInPlace(arena, segment.address(), encrypted.length, TEST_KEY, TEST_IV, fileOffset, SUN_JCE);
 
         // Verify decrypted data
         byte[] decrypted = new byte[TEST_DATA.length];
@@ -168,7 +171,7 @@ public class MemorySegmentDecryptorTests extends OpenSearchTestCase {
         new SecureRandom().nextBytes(largeData);
 
         // Encrypt
-        Cipher cipher = AesCipherFactory.CIPHER_POOL.get();
+        Cipher cipher = AesCipherFactory.getPooledCipher(SUN_JCE);
         SecretKeySpec keySpec = new SecretKeySpec(TEST_KEY, "AES");
         byte[] offsetIV = AesCipherFactory.computeOffsetIVForAesGcmEncrypted(TEST_IV, 0);
         cipher.init(Cipher.ENCRYPT_MODE, keySpec, new IvParameterSpec(offsetIV));
@@ -181,7 +184,7 @@ public class MemorySegmentDecryptorTests extends OpenSearchTestCase {
         }
 
         // Decrypt
-        MemorySegmentDecryptor.decryptInPlace(arena, segment.address(), encrypted.length, TEST_KEY, TEST_IV, 0);
+        MemorySegmentDecryptor.decryptInPlace(arena, segment.address(), encrypted.length, TEST_KEY, TEST_IV, 0, SUN_JCE);
 
         // Verify
         byte[] decrypted = new byte[largeData.length];
@@ -196,7 +199,7 @@ public class MemorySegmentDecryptorTests extends OpenSearchTestCase {
         long fileOffset = 17; // Non-aligned offset
 
         // Encrypt with offset
-        Cipher cipher = AesCipherFactory.CIPHER_POOL.get();
+        Cipher cipher = AesCipherFactory.getPooledCipher(SUN_JCE);
         SecretKeySpec keySpec = new SecretKeySpec(TEST_KEY, "AES");
         byte[] offsetIV = AesCipherFactory.computeOffsetIVForAesGcmEncrypted(TEST_IV, fileOffset);
         cipher.init(Cipher.ENCRYPT_MODE, keySpec, new IvParameterSpec(offsetIV));
@@ -215,7 +218,7 @@ public class MemorySegmentDecryptorTests extends OpenSearchTestCase {
             segment.set(ValueLayout.JAVA_BYTE, i, encrypted[i]);
         }
 
-        MemorySegmentDecryptor.decryptInPlace(arena, segment.address(), encrypted.length, TEST_KEY, TEST_IV, fileOffset);
+        MemorySegmentDecryptor.decryptInPlace(arena, segment.address(), encrypted.length, TEST_KEY, TEST_IV, fileOffset, SUN_JCE);
 
         // Verify
         byte[] decrypted = new byte[TEST_DATA.length];
@@ -230,7 +233,7 @@ public class MemorySegmentDecryptorTests extends OpenSearchTestCase {
         byte[] emptyData = new byte[0];
 
         // Encrypt empty data
-        Cipher cipher = AesCipherFactory.CIPHER_POOL.get();
+        Cipher cipher = AesCipherFactory.getPooledCipher(SUN_JCE);
         SecretKeySpec keySpec = new SecretKeySpec(TEST_KEY, "AES");
         byte[] offsetIV = AesCipherFactory.computeOffsetIVForAesGcmEncrypted(TEST_IV, 0);
         cipher.init(Cipher.ENCRYPT_MODE, keySpec, new IvParameterSpec(offsetIV));
@@ -243,7 +246,7 @@ public class MemorySegmentDecryptorTests extends OpenSearchTestCase {
 
         // Allocate and decrypt
         MemorySegment segment = arena.allocate(Math.max(1, encrypted.length));
-        MemorySegmentDecryptor.decryptInPlace(arena, segment.address(), encrypted.length, TEST_KEY, TEST_IV, 0);
+        MemorySegmentDecryptor.decryptInPlace(arena, segment.address(), encrypted.length, TEST_KEY, TEST_IV, 0, SUN_JCE);
 
         // Should complete without error
     }
@@ -257,7 +260,7 @@ public class MemorySegmentDecryptorTests extends OpenSearchTestCase {
             originalData[i] = ("Segment " + i + " data content").getBytes(StandardCharsets.UTF_8);
 
             // Encrypt
-            Cipher cipher = AesCipherFactory.CIPHER_POOL.get();
+            Cipher cipher = AesCipherFactory.getPooledCipher(SUN_JCE);
             SecretKeySpec keySpec = new SecretKeySpec(TEST_KEY, "AES");
             byte[] offsetIV = AesCipherFactory.computeOffsetIVForAesGcmEncrypted(TEST_IV, i * 1024L);
             cipher.init(Cipher.ENCRYPT_MODE, keySpec, new IvParameterSpec(offsetIV));
@@ -275,7 +278,7 @@ public class MemorySegmentDecryptorTests extends OpenSearchTestCase {
             }
 
             // Decrypt
-            MemorySegmentDecryptor.decryptSegment(segments[i], i * 1024L, TEST_KEY, TEST_IV, encrypted.length);
+            MemorySegmentDecryptor.decryptSegment(segments[i], i * 1024L, TEST_KEY, TEST_IV, encrypted.length, SUN_JCE);
 
             // Verify
             byte[] decrypted = new byte[originalData[i].length];
@@ -294,7 +297,7 @@ public class MemorySegmentDecryptorTests extends OpenSearchTestCase {
         new SecureRandom().nextBytes(testData);
 
         // Encrypt
-        Cipher cipher = AesCipherFactory.CIPHER_POOL.get();
+        Cipher cipher = AesCipherFactory.getPooledCipher(SUN_JCE);
         SecretKeySpec keySpec = new SecretKeySpec(TEST_KEY, "AES");
         byte[] offsetIV = AesCipherFactory.computeOffsetIVForAesGcmEncrypted(TEST_IV, 0);
         cipher.init(Cipher.ENCRYPT_MODE, keySpec, new IvParameterSpec(offsetIV));
@@ -307,7 +310,7 @@ public class MemorySegmentDecryptorTests extends OpenSearchTestCase {
         }
 
         // Decrypt using chunked processing
-        MemorySegmentDecryptor.decryptSegment(segment, 0, TEST_KEY, TEST_IV, encrypted.length);
+        MemorySegmentDecryptor.decryptSegment(segment, 0, TEST_KEY, TEST_IV, encrypted.length, SUN_JCE);
 
         // Verify
         byte[] decrypted = new byte[testData.length];

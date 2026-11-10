@@ -4,11 +4,10 @@
  */
 package org.opensearch.index.store.cipher;
 
-import static org.opensearch.index.store.cipher.AesCipherFactory.CIPHER_POOL;
-
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.nio.ByteBuffer;
+import java.security.Provider;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
@@ -64,11 +63,12 @@ public class MemorySegmentDecryptor {
      * @param key the AES decryption key bytes
      * @param iv the initialization vector for AES-CTR mode
      * @param fileOffset the offset within the file where this data starts, used for IV computation
+     * @param provider the JCE provider used to obtain the pooled CTR cipher
      * @throws Exception if decryption fails due to cryptographic errors or memory access issues
      */
-    public static void decryptInPlace(Arena arena, long addr, long length, byte[] key, byte[] iv, long fileOffset) throws Exception {
-        // Get thread-local cipher
-        Cipher cipher = CIPHER_POOL.get();
+    public static void decryptInPlace(Arena arena, long addr, long length, byte[] key, byte[] iv, long fileOffset, Provider provider)
+        throws Exception {
+        Cipher cipher = AesCipherFactory.getPooledCipher(provider);
         SecretKeySpec keySpec = new SecretKeySpec(key, AesCipherFactory.ALGORITHM);
         byte[] ivCopy = AesCipherFactory.computeOffsetIVForAesGcmEncrypted(iv, fileOffset);
 
@@ -123,10 +123,11 @@ public class MemorySegmentDecryptor {
      * @param key the AES decryption key bytes
      * @param iv the initialization vector for AES-CTR mode
      * @param fileOffset the offset within the file where this data starts, used for IV computation
+     * @param provider the JCE provider used to obtain the pooled CTR cipher
      * @throws Exception if decryption fails due to cryptographic errors or memory access issues
      */
-    public static void decryptInPlace(long addr, long length, byte[] key, byte[] iv, long fileOffset) throws Exception {
-        Cipher cipher = CIPHER_POOL.get();
+    public static void decryptInPlace(long addr, long length, byte[] key, byte[] iv, long fileOffset, Provider provider) throws Exception {
+        Cipher cipher = AesCipherFactory.getPooledCipher(provider);
         SecretKeySpec keySpec = new SecretKeySpec(key, AesCipherFactory.ALGORITHM);
         byte[] ivCopy = AesCipherFactory.computeOffsetIVForAesGcmEncrypted(iv, fileOffset);
 
@@ -181,10 +182,12 @@ public class MemorySegmentDecryptor {
      * @param key the AES decryption key bytes
      * @param iv the initialization vector for AES-CTR mode
      * @param segmentSize the size of the segment to decrypt in bytes
+     * @param provider the JCE provider used to obtain the pooled CTR cipher
      * @throws Exception if decryption fails due to cryptographic errors or segment access issues
      */
-    public static void decryptSegment(MemorySegment segment, long fileOffset, byte[] key, byte[] iv, int segmentSize) throws Exception {
-        Cipher cipher = CIPHER_POOL.get();
+    public static void decryptSegment(MemorySegment segment, long fileOffset, byte[] key, byte[] iv, int segmentSize, Provider provider)
+        throws Exception {
+        Cipher cipher = AesCipherFactory.getPooledCipher(provider);
         SecretKeySpec keySpec = new SecretKeySpec(key, AesCipherFactory.ALGORITHM);
         byte[] ivCopy = AesCipherFactory.computeOffsetIVForAesGcmEncrypted(iv, fileOffset);
 
@@ -228,7 +231,8 @@ public class MemorySegmentDecryptor {
         long frameSize,
         long fileOffset,
         String filePath,
-        EncryptionMetadataCache cache
+        EncryptionMetadataCache cache,
+        Provider provider
     ) throws Exception {
 
         // Fast path: single frame
@@ -236,8 +240,9 @@ public class MemorySegmentDecryptor {
         long offsetWithinFrame = fileOffset % frameSize;
 
         if (offsetWithinFrame + length <= frameSize) {
-            byte[] frameIV = AesCipherFactory.computeFrameIV(directoryKey, messageId, frameNumber, offsetWithinFrame, filePath, cache);
-            decryptInPlace(addr, length, fileKey, frameIV, offsetWithinFrame);
+            byte[] frameIV = AesCipherFactory
+                .computeFrameIV(directoryKey, messageId, frameNumber, offsetWithinFrame, filePath, cache, provider);
+            decryptInPlace(addr, length, fileKey, frameIV, offsetWithinFrame, provider);
             return;
         }
 
@@ -253,9 +258,9 @@ public class MemorySegmentDecryptor {
             long bytesInFrame = Math.min(remaining, frameEnd - currentOffset);
 
             byte[] frameIV = AesCipherFactory
-                .computeFrameIV(directoryKey, messageId, frameNumber, currentOffset - frameStart, filePath, cache);
+                .computeFrameIV(directoryKey, messageId, frameNumber, currentOffset - frameStart, filePath, cache, provider);
 
-            decryptInPlace(addr + bufferOffset, bytesInFrame, fileKey, frameIV, currentOffset);
+            decryptInPlace(addr + bufferOffset, bytesInFrame, fileKey, frameIV, currentOffset, provider);
 
             currentOffset += bytesInFrame;
             bufferOffset += bytesInFrame;

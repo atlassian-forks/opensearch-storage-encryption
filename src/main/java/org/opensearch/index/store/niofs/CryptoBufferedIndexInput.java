@@ -13,6 +13,7 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
+import java.security.Provider;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -54,6 +55,7 @@ final class CryptoBufferedIndexInput extends BufferedIndexInput {
     private final int frameSizePower;
     private final EncryptionAlgorithm algorithm;
     private final EncryptionMetadataCache encryptionMetadataCache;
+    private final Provider provider;
 
     private ByteBuffer tmpBuffer = EMPTY_BYTEBUFFER;
 
@@ -65,7 +67,8 @@ final class CryptoBufferedIndexInput extends BufferedIndexInput {
         IOContext context,
         KeyResolver keyResolver,
         Path filePath,
-        EncryptionMetadataCache encryptionMetadataCache
+        EncryptionMetadataCache encryptionMetadataCache,
+        Provider provider
     )
         throws IOException {
         super(resourceDesc, context);
@@ -76,15 +79,17 @@ final class CryptoBufferedIndexInput extends BufferedIndexInput {
         this.isClone = false;
         this.normalizedFilePath = EncryptionMetadataCache.normalizePath(filePath);
         this.encryptionMetadataCache = encryptionMetadataCache;
+        this.provider = provider;
 
         // Get master key first
         this.masterKey = keyResolver.getDataKey().getEncoded();
 
         // Read footer and cache metadata atomically
-        EncryptionFooter footer = EncryptionFooter.readViaFileChannel(normalizedFilePath, channel, masterKey, encryptionMetadataCache);
+        EncryptionFooter footer = EncryptionFooter
+            .readViaFileChannel(normalizedFilePath, channel, masterKey, encryptionMetadataCache, provider);
 
         // Get metadata (already cached by readViaFileChannel)
-        var metadata = encryptionMetadataCache.getOrLoadMetadata(normalizedFilePath, footer, masterKey);
+        var metadata = encryptionMetadataCache.getOrLoadMetadata(normalizedFilePath, footer, masterKey, provider);
         this.messageId = metadata.getFooter().getMessageId();
         this.frameSize = metadata.getFooter().getFrameSize();
         this.frameSizePower = metadata.getFooter().getFrameSizePower();
@@ -110,7 +115,8 @@ final class CryptoBufferedIndexInput extends BufferedIndexInput {
         byte[] masterKey,
         byte[] messageId,
         String normalizedFilePath,
-        EncryptionMetadataCache encryptionMetadataCache
+        EncryptionMetadataCache encryptionMetadataCache,
+        Provider provider
     )
         throws IOException {
         super(resourceDesc, bufferSize);
@@ -128,6 +134,7 @@ final class CryptoBufferedIndexInput extends BufferedIndexInput {
         this.messageId = messageId;  // Passed from parent
         this.normalizedFilePath = normalizedFilePath;
         this.encryptionMetadataCache = encryptionMetadataCache;
+        this.provider = provider;
     }
 
     @Override
@@ -166,7 +173,8 @@ final class CryptoBufferedIndexInput extends BufferedIndexInput {
             masterKey,  // Pass directory key
             messageId,      // Pass message ID
             normalizedFilePath,
-            encryptionMetadataCache
+            encryptionMetadataCache,
+            provider
         );
     }
 
@@ -199,9 +207,17 @@ final class CryptoBufferedIndexInput extends BufferedIndexInput {
         tmpBuffer.flip();
 
         try {
-            Cipher cipher = algorithm.getDecryptionCipher();
+            Cipher cipher = algorithm.getDecryptionCipher(provider);
             byte[] frameIV = AesCipherFactory
-                .computeFrameIV(masterKey, messageId, frameNumber, offsetWithinFrame, this.normalizedFilePath, encryptionMetadataCache);
+                .computeFrameIV(
+                    masterKey,
+                    messageId,
+                    frameNumber,
+                    offsetWithinFrame,
+                    this.normalizedFilePath,
+                    encryptionMetadataCache,
+                    provider
+                );
             cipher.init(Cipher.DECRYPT_MODE, keySpec, new IvParameterSpec(frameIV));
 
             // skip partial AES block within frame if needed

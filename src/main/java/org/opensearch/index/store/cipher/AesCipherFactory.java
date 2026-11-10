@@ -5,14 +5,15 @@
 package org.opensearch.index.store.cipher;
 
 import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
 import java.security.Provider;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 
 import javax.crypto.Cipher;
 import javax.crypto.NoSuchPaddingException;
 
-import org.opensearch.index.store.CryptoDirectoryFactory;
 import org.opensearch.index.store.footer.EncryptionMetadataTrailer;
 import org.opensearch.index.store.key.HkdfKeyDerivation;
 
@@ -59,18 +60,22 @@ public class AesCipherFactory {
     }
 
     /**
-     * Thread-local cipher pool for AES/CTR/NoPadding operations.
-     * Each thread gets its own cipher instance to avoid synchronization overhead.
+     * Thread-local, provider-keyed cipher pool for AES/CTR/NoPadding operations.
+     * Each thread gets its own cipher instance per provider so mixed-provider nodes
+     * stay correct without synchronization on the hot path.
      */
-    public static final ThreadLocal<Cipher> CIPHER_POOL = ThreadLocal.withInitial(() -> {
-        try {
-            // todo we can make provider comfigirable but for now with AES/CTR, SunJCE works best
-            // in terms of performance.
-            return Cipher.getInstance("AES/CTR/NoPadding", CryptoDirectoryFactory.DEFAULT_CRYPTO_PROVIDER);
-        } catch (NoSuchAlgorithmException | NoSuchProviderException | NoSuchPaddingException e) {
-            throw new RuntimeException(e);
-        }
-    });
+    private static final ThreadLocal<Map<String, Cipher>> CIPHER_POOLS = ThreadLocal.withInitial(HashMap::new);
+
+    /**
+     * Returns a thread-local pooled AES/CTR/NoPadding cipher for the given provider.
+     *
+     * @param provider the JCE provider to use
+     * @return a pooled {@link Cipher} instance bound to {@code provider}
+     */
+    public static Cipher getPooledCipher(Provider provider) {
+        Objects.requireNonNull(provider, "provider");
+        return CIPHER_POOLS.get().computeIfAbsent(provider.getName(), name -> getCipher(provider));
+    }
 
     /**
      * Computes an offset-adjusted IV for CTR mode decryption at a specific file position.
@@ -146,6 +151,7 @@ public class AesCipherFactory {
      * @param offsetWithinFrame the byte offset within the frame
      * @param normalizedFilePath the normalized file path string
      * @param encryptionMetadataCache the encryption metadata cache
+     * @param provider the JCE provider used for HKDF HMAC
      * @return frame-specific IV for encryption/decryption
      */
     public static byte[] computeFrameIV(
@@ -154,7 +160,8 @@ public class AesCipherFactory {
         long frameNumber,
         long offsetWithinFrame,
         String normalizedFilePath,
-        EncryptionMetadataCache encryptionMetadataCache
+        EncryptionMetadataCache encryptionMetadataCache,
+        Provider provider
     ) {
         if (messageId.length != 16) {
             throw new IllegalArgumentException("MessageId must be 16 bytes");
@@ -167,7 +174,7 @@ public class AesCipherFactory {
         byte[] frameBaseIV = encryptionMetadataCache.getFrameIv(normalizedFilePath, frameNumber);
         if (frameBaseIV == null) {
             String frameContext = EncryptionMetadataTrailer.FRAME_CONTEXT_PREFIX + frameNumber;
-            frameBaseIV = HkdfKeyDerivation.deriveKey(directoryKey, messageId, frameContext, 16);
+            frameBaseIV = HkdfKeyDerivation.deriveKey(directoryKey, messageId, frameContext, 16, provider);
             encryptionMetadataCache.putFrameIv(normalizedFilePath, frameNumber, frameBaseIV);
         }
 
