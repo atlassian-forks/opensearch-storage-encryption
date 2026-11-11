@@ -220,9 +220,12 @@ final class CryptoBufferedIndexInput extends BufferedIndexInput {
             cipher.init(Cipher.DECRYPT_MODE, keySpec, new IvParameterSpec(frameIV));
 
             int pendingSkip = AesCipherFactory.advanceCtrSkip(cipher, AesCipherFactory.skipBytesForOffset(offsetWithinFrame));
-            boolean atEof = end - position <= bytesRead;
+            // Each read() re-inits the cipher, so always doFinal. Buffering providers
+            // (Bouncy Castle) keep a partial AES block across update() even when skip is 0;
+            // returning update() alone can emit 0 on the next independently inited read
+            // and spin forever in readInternal().
             if (pendingSkip == 0) {
-                return atEof ? cipher.doFinal(tmpBuffer, dst) : cipher.update(tmpBuffer, dst);
+                return cipher.doFinal(tmpBuffer, dst);
             }
 
             // Buffering providers (Bouncy Castle) emit the skip prefix with later
