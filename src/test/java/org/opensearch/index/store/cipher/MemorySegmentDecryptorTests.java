@@ -320,4 +320,81 @@ public class MemorySegmentDecryptorTests extends OpenSearchTestCase {
 
         assertArrayEquals(testData, decrypted);
     }
+
+    public void testDecryptInPlaceUnalignedOffsetWithBouncyCastleLength32() throws Exception {
+        assertDecryptInPlaceUnalignedWithProvider(bouncyCastle(), 1, 32);
+    }
+
+    public void testDecryptInPlaceUnalignedOffsetWithBouncyCastleLength31() throws Exception {
+        assertDecryptInPlaceUnalignedWithProvider(bouncyCastle(), 1, 31);
+    }
+
+    public void testDecryptSegmentUnalignedOffsetWithBouncyCastle() throws Exception {
+        Provider bc = bouncyCastle();
+        byte[] plaintext = new byte[128];
+        new SecureRandom().nextBytes(plaintext);
+        byte[] ciphertext = encryptAtOffsetZero(plaintext, SUN_JCE);
+
+        int offset = 1;
+        int length = 32;
+        MemorySegment segment = arena.allocate(length);
+        for (int i = 0; i < length; i++) {
+            segment.set(ValueLayout.JAVA_BYTE, i, ciphertext[offset + i]);
+        }
+
+        MemorySegmentDecryptor.decryptSegment(segment, offset, TEST_KEY, TEST_IV, length, bc);
+
+        byte[] decrypted = new byte[length];
+        for (int i = 0; i < length; i++) {
+            decrypted[i] = segment.get(ValueLayout.JAVA_BYTE, i);
+        }
+        assertArrayEquals(Arrays.copyOfRange(plaintext, offset, offset + length), decrypted);
+    }
+
+    private void assertDecryptInPlaceUnalignedWithProvider(Provider provider, int offset, int length) throws Exception {
+        byte[] plaintext = new byte[128];
+        new SecureRandom().nextBytes(plaintext);
+        byte[] ciphertext = encryptAtOffsetZero(plaintext, SUN_JCE);
+
+        MemorySegment segment = arena.allocate(length);
+        for (int i = 0; i < length; i++) {
+            segment.set(ValueLayout.JAVA_BYTE, i, ciphertext[offset + i]);
+        }
+
+        MemorySegmentDecryptor.decryptInPlace(arena, segment.address(), length, TEST_KEY, TEST_IV, offset, provider);
+
+        byte[] decrypted = new byte[length];
+        for (int i = 0; i < length; i++) {
+            decrypted[i] = segment.get(ValueLayout.JAVA_BYTE, i);
+        }
+        assertArrayEquals(Arrays.copyOfRange(plaintext, offset, offset + length), decrypted);
+
+        MemorySegment global = arena.allocate(length);
+        for (int i = 0; i < length; i++) {
+            global.set(ValueLayout.JAVA_BYTE, i, ciphertext[offset + i]);
+        }
+        MemorySegmentDecryptor.decryptInPlace(global.address(), length, TEST_KEY, TEST_IV, offset, provider);
+        byte[] globalDecrypted = new byte[length];
+        for (int i = 0; i < length; i++) {
+            globalDecrypted[i] = global.get(ValueLayout.JAVA_BYTE, i);
+        }
+        assertArrayEquals(Arrays.copyOfRange(plaintext, offset, offset + length), globalDecrypted);
+    }
+
+    private static byte[] encryptAtOffsetZero(byte[] plaintext, Provider provider) throws Exception {
+        Cipher cipher = Cipher.getInstance("AES/CTR/NoPadding", provider);
+        SecretKeySpec keySpec = new SecretKeySpec(TEST_KEY, "AES");
+        byte[] offsetIV = AesCipherFactory.computeOffsetIVForAesGcmEncrypted(TEST_IV, 0);
+        cipher.init(Cipher.ENCRYPT_MODE, keySpec, new IvParameterSpec(offsetIV));
+        return cipher.doFinal(plaintext);
+    }
+
+    private static Provider bouncyCastle() {
+        Provider bc = Security.getProvider("BC");
+        if (bc == null) {
+            bc = new org.bouncycastle.jce.provider.BouncyCastleProvider();
+            Security.addProvider(bc);
+        }
+        return bc;
+    }
 }

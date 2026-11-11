@@ -37,7 +37,6 @@ import javax.crypto.spec.SecretKeySpec;
 @SuppressWarnings("preview")
 public class MemorySegmentDecryptor {
 
-    private static final byte[] ZERO_SKIP = new byte[1 << AesCipherFactory.AES_BLOCK_SIZE_BYTES_IN_POWER];
     private static final int DEFAULT_MAX_CHUNK_SIZE = 16_384;
 
     /**
@@ -74,38 +73,8 @@ public class MemorySegmentDecryptor {
 
         cipher.init(Cipher.DECRYPT_MODE, keySpec, new IvParameterSpec(ivCopy));
 
-        if ((fileOffset & ((AesCipherFactory.AES_BLOCK_SIZE_BYTES_IN_POWER) - 1)) > 0) {
-            cipher.update(ZERO_SKIP, 0, (int) (fileOffset & ((1 << AesCipherFactory.AES_BLOCK_SIZE_BYTES_IN_POWER) - 1)));
-        }
-
         MemorySegment segment = MemorySegment.ofAddress(addr).reinterpret(length, arena, null);
-        ByteBuffer buffer = segment.asByteBuffer();
-
-        final int CHUNK_SIZE = Math.min(DEFAULT_MAX_CHUNK_SIZE, (int) length); // typecast is safe.
-        byte[] chunk = new byte[CHUNK_SIZE];
-        byte[] decryptedChunk = new byte[CHUNK_SIZE];
-
-        int position = 0;
-        while (position < buffer.capacity()) {
-            int size = Math.min(CHUNK_SIZE, buffer.capacity() - position);
-
-            buffer.position(position);
-            buffer.get(chunk, 0, size);
-
-            int decryptedLength = cipher.update(chunk, 0, size, decryptedChunk, 0);
-            if (decryptedLength > 0) {
-                buffer.position(position);
-                buffer.put(decryptedChunk, 0, decryptedLength);
-            }
-
-            position += size;
-        }
-
-        int finalLength = cipher.doFinal(new byte[0], 0, 0, decryptedChunk, 0);
-        if (finalLength > 0) {
-            buffer.position(position - finalLength);
-            buffer.put(decryptedChunk, 0, finalLength);
-        }
+        decryptByteBuffer(cipher, segment.asByteBuffer(), fileOffset);
     }
 
     /**
@@ -133,38 +102,8 @@ public class MemorySegmentDecryptor {
 
         cipher.init(Cipher.DECRYPT_MODE, keySpec, new IvParameterSpec(ivCopy));
 
-        if ((fileOffset & ((1 << AesCipherFactory.AES_BLOCK_SIZE_BYTES_IN_POWER) - 1)) > 0) {
-            cipher.update(ZERO_SKIP, 0, (int) (fileOffset & ((1 << AesCipherFactory.AES_BLOCK_SIZE_BYTES_IN_POWER) - 1)));
-        }
-
         MemorySegment segment = MemorySegment.ofAddress(addr).reinterpret(length);
-        ByteBuffer buffer = segment.asByteBuffer();
-
-        final int CHUNK_SIZE = Math.min(DEFAULT_MAX_CHUNK_SIZE, (int) length); // typecast is safe.
-        byte[] chunk = new byte[CHUNK_SIZE];
-        byte[] decryptedChunk = new byte[CHUNK_SIZE];
-
-        int position = 0;
-        while (position < buffer.capacity()) {
-            int size = Math.min(CHUNK_SIZE, buffer.capacity() - position);
-
-            buffer.position(position);
-            buffer.get(chunk, 0, size);
-
-            int decryptedLength = cipher.update(chunk, 0, size, decryptedChunk, 0);
-            if (decryptedLength > 0) {
-                buffer.position(position);
-                buffer.put(decryptedChunk, 0, decryptedLength);
-            }
-
-            position += size;
-        }
-
-        int finalLength = cipher.doFinal(new byte[0], 0, 0, decryptedChunk, 0);
-        if (finalLength > 0) {
-            buffer.position(position - finalLength);
-            buffer.put(decryptedChunk, 0, finalLength);
-        }
+        decryptByteBuffer(cipher, segment.asByteBuffer(), fileOffset);
     }
 
     /**
@@ -192,31 +131,59 @@ public class MemorySegmentDecryptor {
         byte[] ivCopy = AesCipherFactory.computeOffsetIVForAesGcmEncrypted(iv, fileOffset);
 
         cipher.init(Cipher.DECRYPT_MODE, keySpec, new IvParameterSpec(ivCopy));
+        decryptByteBuffer(cipher, segment.asByteBuffer(), fileOffset);
+    }
 
-        if ((fileOffset & ((1 << AesCipherFactory.AES_BLOCK_SIZE_BYTES_IN_POWER) - 1)) > 0) {
-            cipher.update(ZERO_SKIP, 0, (int) (fileOffset & ((1 << AesCipherFactory.AES_BLOCK_SIZE_BYTES_IN_POWER) - 1)));
-        }
+    /**
+     * Decrypts {@code buffer} in place. Discards a CTR skip prefix that a buffering
+     * provider (Bouncy Castle) may emit with later ciphertext instead of during skip.
+     */
+    private static void decryptByteBuffer(Cipher cipher, ByteBuffer buffer, long fileOffset) throws Exception {
+        int pendingSkip = AesCipherFactory.advanceCtrSkip(cipher, AesCipherFactory.skipBytesForOffset(fileOffset));
+        final int chunkSize = Math.min(DEFAULT_MAX_CHUNK_SIZE, Math.max(buffer.capacity(), 1));
+        byte[] chunk = new byte[chunkSize];
+        byte[] decryptedChunk = new byte[chunkSize + AesCipherFactory.AES_BLOCK_SIZE_BYTES];
 
-        ByteBuffer buffer = segment.asByteBuffer();
-        final int CHUNK_SIZE = Math.min(DEFAULT_MAX_CHUNK_SIZE, segmentSize);
-        byte[] chunk = new byte[CHUNK_SIZE];
-        byte[] decryptedChunk = new byte[CHUNK_SIZE];
-
-        int position = 0;
-        while (position < buffer.capacity()) {
-            int size = Math.min(CHUNK_SIZE, buffer.capacity() - position);
-
-            buffer.position(position);
+        int readPos = 0;
+        int writePos = 0;
+        while (readPos < buffer.capacity()) {
+            int size = Math.min(chunkSize, buffer.capacity() - readPos);
+            buffer.position(readPos);
             buffer.get(chunk, 0, size);
 
             int decryptedLength = cipher.update(chunk, 0, size, decryptedChunk, 0);
-            if (decryptedLength > 0) {
-                buffer.position(position);
-                buffer.put(decryptedChunk, 0, decryptedLength);
-            }
-
-            position += size;
+            writePos += copyDiscardingSkip(buffer, decryptedChunk, decryptedLength, writePos, pendingSkip);
+            pendingSkip = remainingSkipAfterCopy(pendingSkip, decryptedLength);
+            readPos += size;
         }
+
+        int finalLength = cipher.doFinal(new byte[0], 0, 0, decryptedChunk, 0);
+        copyDiscardingSkip(buffer, decryptedChunk, finalLength, writePos, pendingSkip);
+    }
+
+    private static int remainingSkipAfterCopy(int pendingSkip, int decryptedLength) {
+        if (pendingSkip <= 0 || decryptedLength <= 0) {
+            return pendingSkip;
+        }
+        return pendingSkip - Math.min(pendingSkip, decryptedLength);
+    }
+
+    private static int copyDiscardingSkip(ByteBuffer buffer, byte[] decrypted, int decryptedLength, int writePos, int pendingSkip) {
+        if (decryptedLength <= 0) {
+            return 0;
+        }
+        int from = 0;
+        if (pendingSkip > 0) {
+            int discard = Math.min(pendingSkip, decryptedLength);
+            from += discard;
+            decryptedLength -= discard;
+        }
+        if (decryptedLength <= 0) {
+            return 0;
+        }
+        buffer.position(writePos);
+        buffer.put(decrypted, from, decryptedLength);
+        return decryptedLength;
     }
 
     /**

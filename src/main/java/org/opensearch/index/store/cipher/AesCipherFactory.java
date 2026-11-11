@@ -13,6 +13,7 @@ import java.util.Objects;
 
 import javax.crypto.Cipher;
 import javax.crypto.NoSuchPaddingException;
+import javax.crypto.ShortBufferException;
 
 import org.opensearch.index.store.footer.EncryptionMetadataTrailer;
 import org.opensearch.index.store.key.HkdfKeyDerivation;
@@ -34,6 +35,11 @@ public class AesCipherFactory {
 
     /** AES block size in terms of 2 power bytes (16 bytes). Required for counter calculations. */
     public static final int AES_BLOCK_SIZE_BYTES_IN_POWER = 4;
+
+    /** AES block size in bytes (16). */
+    public static final int AES_BLOCK_SIZE_BYTES = 1 << AES_BLOCK_SIZE_BYTES_IN_POWER;
+
+    private static final byte[] ZERO_SKIP = new byte[AES_BLOCK_SIZE_BYTES];
 
     /** Number of bytes used for the counter in the IV (last 4 bytes). */
     public static final int COUNTER_SIZE_BYTES = 4;
@@ -75,6 +81,39 @@ public class AesCipherFactory {
     public static Cipher getPooledCipher(Provider provider) {
         Objects.requireNonNull(provider, "provider");
         return CIPHER_POOLS.get().computeIfAbsent(provider.getName(), name -> getCipher(provider));
+    }
+
+    /**
+     * Intra-block CTR skip for {@code offset}: {@code offset % 16}.
+     *
+     * @param offset byte offset in the stream
+     * @return number of keystream bytes to skip within the current AES block
+     */
+    public static int skipBytesForOffset(long offset) {
+        return (int) (offset & (AES_BLOCK_SIZE_BYTES - 1));
+    }
+
+    /**
+     * Advances a CTR cipher by feeding {@code skipBytes} of zeros. SunJCE emits that
+     * prefix immediately; Bouncy Castle buffers a partial AES block, so the prefix
+     * appears at the start of a later {@code update}/{@code doFinal}. Returns how many
+     * of those later output bytes must be discarded.
+     *
+     * @param cipher an initialized AES/CTR cipher
+     * @param skipBytes keystream bytes to skip, in {@code [0, 16)}
+     * @return pending skip-prefix length in subsequent output
+     * @throws ShortBufferException if the provider needs more than one AES block of skip output
+     */
+    public static int advanceCtrSkip(Cipher cipher, int skipBytes) throws ShortBufferException {
+        if (skipBytes <= 0) {
+            return 0;
+        }
+        byte[] skipOut = new byte[AES_BLOCK_SIZE_BYTES];
+        int emitted = cipher.update(ZERO_SKIP, 0, skipBytes, skipOut, 0);
+        if (emitted < 0) {
+            emitted = 0;
+        }
+        return skipBytes - emitted;
     }
 
     /**

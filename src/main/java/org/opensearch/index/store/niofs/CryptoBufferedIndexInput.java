@@ -38,7 +38,6 @@ import org.opensearch.index.store.key.KeyResolver;
  * @opensearch.internal
  */
 final class CryptoBufferedIndexInput extends BufferedIndexInput {
-    private static final byte[] ZERO_SKIP = new byte[1 << AesCipherFactory.AES_BLOCK_SIZE_BYTES_IN_POWER];
     private static final ByteBuffer EMPTY_BYTEBUFFER = ByteBuffer.allocate(0);
     private static final int CHUNK_SIZE = 16_384;
 
@@ -220,14 +219,28 @@ final class CryptoBufferedIndexInput extends BufferedIndexInput {
                 );
             cipher.init(Cipher.DECRYPT_MODE, keySpec, new IvParameterSpec(frameIV));
 
-            // skip partial AES block within frame if needed
-            int skipBytes = (int) (offsetWithinFrame & ((1 << AesCipherFactory.AES_BLOCK_SIZE_BYTES_IN_POWER) - 1));
-            if (skipBytes > 0) {
-                cipher.update(ZERO_SKIP, 0, skipBytes);
+            int pendingSkip = AesCipherFactory.advanceCtrSkip(cipher, AesCipherFactory.skipBytesForOffset(offsetWithinFrame));
+            boolean atEof = end - position <= bytesRead;
+            if (pendingSkip == 0) {
+                return atEof ? cipher.doFinal(tmpBuffer, dst) : cipher.update(tmpBuffer, dst);
             }
 
-            // decrypt into dst
-            return (end - position > bytesRead) ? cipher.update(tmpBuffer, dst) : cipher.doFinal(tmpBuffer, dst);
+            // Buffering providers (Bouncy Castle) emit the skip prefix with later
+            // ciphertext. Decrypt into a buffer large enough for skip + ciphertext,
+            // then copy only the requested plaintext into dst.
+            ByteBuffer out = ByteBuffer.allocate(pendingSkip + bytesRead + AesCipherFactory.AES_BLOCK_SIZE_BYTES);
+            cipher.update(tmpBuffer, out);
+            cipher.doFinal(ByteBuffer.allocate(0), out);
+            out.flip();
+            if (out.remaining() < pendingSkip) {
+                throw new ShortBufferException("CTR skip prefix missing from decrypt output");
+            }
+            out.position(out.position() + pendingSkip);
+            int toCopy = Math.min(out.remaining(), dst.remaining());
+            ByteBuffer plaintext = out.slice();
+            plaintext.limit(toCopy);
+            dst.put(plaintext);
+            return toCopy;
         } catch (ShortBufferException | IllegalBlockSizeException | BadPaddingException | InvalidAlgorithmParameterException
             | InvalidKeyException ex) {
             throw new IOException("Failed to decrypt block at position " + position, ex);
