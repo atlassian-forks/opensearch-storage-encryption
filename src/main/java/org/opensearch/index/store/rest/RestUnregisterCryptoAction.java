@@ -12,7 +12,7 @@ import java.util.List;
 
 import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.RestRequest;
-import org.opensearch.transport.client.node.NodeClient;
+import org.opensearch.client.node.NodeClient;
 
 public class RestUnregisterCryptoAction extends BaseRestHandler {
 

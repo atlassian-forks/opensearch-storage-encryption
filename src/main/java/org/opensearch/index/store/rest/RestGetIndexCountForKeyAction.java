@@ -16,7 +16,7 @@ import org.opensearch.index.store.action.GetIndexCountForKeyRequest;
 import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.rest.action.RestToXContentListener;
-import org.opensearch.transport.client.node.NodeClient;
+import org.opensearch.client.node.NodeClient;
 
 public class RestGetIndexCountForKeyAction extends BaseRestHandler {
 

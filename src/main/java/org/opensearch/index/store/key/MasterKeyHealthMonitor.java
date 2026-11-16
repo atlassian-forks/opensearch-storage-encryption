@@ -25,7 +25,7 @@ import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.index.store.CryptoDirectoryFactory;
-import org.opensearch.transport.client.Client;
+import org.opensearch.client.Client;
 
 /**
  * Health monitor for encryption keys across all encrypted indices on a node.

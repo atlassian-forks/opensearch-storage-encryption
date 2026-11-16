@@ -11,7 +11,7 @@ import static org.opensearch.rest.RestRequest.Method.POST;
 import org.junit.Before;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.test.OpenSearchTestCase;
-import org.opensearch.transport.client.node.NodeClient;
+import org.opensearch.client.node.NodeClient;
 
 public class RestRegisterCryptoActionTests extends OpenSearchTestCase {
 
