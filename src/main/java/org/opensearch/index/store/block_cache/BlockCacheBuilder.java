@@ -11,6 +11,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.common.util.concurrent.OpenSearchExecutors;
 import org.opensearch.common.util.concurrent.ThreadContext;
+import org.opensearch.index.store.PrivilegedAccess;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -82,23 +83,25 @@ public final class BlockCacheBuilder {
                 new ThreadContext(org.opensearch.common.settings.Settings.EMPTY)
             );
 
-        Cache<BlockCacheKey, BlockCacheValue<T>> cache = Caffeine
-            .newBuilder()
-            .initialCapacity(initialCapacity)
-            .recordStats()
-            .maximumSize(maxBlocks)
-            .removalListener((BlockCacheKey key, BlockCacheValue<T> value, RemovalCause cause) -> {
-                if (value != null) {
-                    removalExec.execute(() -> {
-                        try {
-                            value.close();
-                        } catch (Throwable t) {
-                            LOGGER.warn("Failed to close cached value during removal {}", key, t);
-                        }
-                    });
-                }
-            })
-            .build();
+        Cache<BlockCacheKey, BlockCacheValue<T>> cache = PrivilegedAccess.doPrivileged(
+            () -> Caffeine
+                .newBuilder()
+                .initialCapacity(initialCapacity)
+                .recordStats()
+                .maximumSize(maxBlocks)
+                .removalListener((BlockCacheKey key, BlockCacheValue<T> value, RemovalCause cause) -> {
+                    if (value != null) {
+                        removalExec.execute(() -> {
+                            try {
+                                value.close();
+                            } catch (Throwable t) {
+                                LOGGER.warn("Failed to close cached value during removal {}", key, t);
+                            }
+                        });
+                    }
+                })
+                .build()
+        );
 
         // Loader is null here because this creates a shared cache instance.
         // Per-directory caches will wrap this cache with their own loaders

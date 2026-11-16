@@ -23,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.opensearch.index.store.PrivilegedAccess;
 import org.opensearch.index.store.block.RefCountedMemorySegment;
 import org.opensearch.index.store.cipher.EncryptionMetadataCache;
 import org.opensearch.index.store.cipher.MemorySegmentDecryptor;
@@ -199,7 +200,7 @@ public class CryptoDirectIOBlockLoader implements BlockLoader<RefCountedMemorySe
         }
 
         // Cache miss - read from disk using a buffered channel (footer reads are small, no O_DIRECT needed)
-        try (FileChannel channel = FileChannel.open(filePath, StandardOpenOption.READ)) {
+        try (FileChannel channel = PrivilegedAccess.doPrivilegedIOException(() -> FileChannel.open(filePath, StandardOpenOption.READ))) {
             long fileSize = channel.size();
             if (fileSize < EncryptionMetadataTrailer.MIN_FOOTER_SIZE) {
                 throw new IOException("File too small to contain footer: " + filePath);
