@@ -59,12 +59,9 @@ public class CryptoEngineFactory implements EngineFactory {
                 cryptoTranslogFactory = new CryptoTranslogFactory(keyResolver, provider);
             }
 
-            // Create new engine config by copying all fields from existing config
-            // but replace the translog factory with our crypto version
-            EngineConfig cryptoConfig = config
-                .toBuilder()
-                .translogFactory(cryptoTranslogFactory)  // <- Replace with our crypto factory
-                .build();
+            // OpenSearch 2.19 EngineConfig cannot be cloned in-place; copy via public getters
+            // and replace only the translog factory with our crypto version.
+            EngineConfig cryptoConfig = EngineConfigCopy.withTranslogFactory(config, cryptoTranslogFactory);
 
             // Pick the engine the same way core's NRTReplicationEngineFactory does: segment-replication
             // and remote-store replicas must not index locally, they receive segments from the primary
