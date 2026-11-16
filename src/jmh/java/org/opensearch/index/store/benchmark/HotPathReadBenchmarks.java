@@ -219,11 +219,12 @@ public class HotPathReadBenchmarks {
         byte[] readBuf = new byte[StaticConfigs.CACHE_BLOCK_SIZE];
         for (int fileIdx = 0; fileIdx < ts.numFilesToRead; fileIdx++) {
             IndexInput fileInput = ts.threadInputs[fileIdx];
-            RandomAccessInput in = (RandomAccessInput) fileInput;
             for (long offset : ts.randomReadByteOffsets) {
                 int readable = (int) Math.min(readBuf.length, ts.fileSize - offset);
                 if (readable > 0) {
-                    in.readBytes(offset, readBuf, 0, readable);
+                    // Lucene 9.12 RandomAccessInput has no positional readBytes(long, byte[], int, int).
+                    fileInput.seek(offset);
+                    fileInput.readBytes(readBuf, 0, readable);
                     bh.consume(readBuf[0]);
                 }
             }
@@ -410,7 +411,9 @@ public class HotPathReadBenchmarks {
                     case 4 -> {
                         int readable = (int) Math.min(readBuf.length, ts.fileSize - offset);
                         if (readable > 0) {
-                            rai.readBytes(offset, readBuf, 0, readable);
+                            // Lucene 9.12 RandomAccessInput has no positional readBytes(long, byte[], int, int).
+                            fileInput.seek(offset);
+                            fileInput.readBytes(readBuf, 0, readable);
                             bh.consume(readBuf[0]);
                         }
                     }
