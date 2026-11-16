@@ -29,6 +29,9 @@ import org.opensearch.threadpool.ThreadPool;
  * Supports both local-only and remote store translogs:
  * - When remote store is disabled: creates CryptoTranslog (local only)
  * - When remote store is enabled: creates CryptoRemoteFsTranslog (with remote sync)
+ *
+ * OpenSearch 2.19 {@link TranslogFactory} is a functional interface with only the 7-arg
+ * {@link #newTranslog} method.
  */
 public class CryptoTranslogFactory implements TranslogFactory {
 
@@ -99,38 +102,10 @@ public class CryptoTranslogFactory implements TranslogFactory {
         LongConsumer persistedSequenceNumberConsumer,
         BooleanSupplier startedPrimarySupplier
     ) throws IOException {
-        assert config.getIndexSettings().isDerivedSourceEnabled() == false; // For derived source supported index, primary method must be
-                                                                            // used
-        return this
-            .newTranslog(
-                config,
-                translogUUID,
-                deletionPolicy,
-                globalCheckpointSupplier,
-                primaryTermSupplier,
-                persistedSequenceNumberConsumer,
-                startedPrimarySupplier,
-                TranslogOperationHelper.DEFAULT
-            );
-    }
 
-    @Override
-    public Translog newTranslog(
-        TranslogConfig config,
-        String translogUUID,
-        TranslogDeletionPolicy deletionPolicy,
-        LongSupplier globalCheckpointSupplier,
-        LongSupplier primaryTermSupplier,
-        LongConsumer persistedSequenceNumberConsumer,
-        BooleanSupplier startedPrimarySupplier,
-        TranslogOperationHelper translogOperationHelper
-    ) throws IOException {
-
-        // Check if remote translog is enabled
         boolean isRemoteTranslogEnabled = config.getIndexSettings().isRemoteTranslogStoreEnabled();
 
         if (isRemoteTranslogEnabled && repository != null) {
-            // Create remote translog with encryption
             assert repository instanceof BlobStoreRepository : "repository should be instance of BlobStoreRepository";
             BlobStoreRepository blobStoreRepository = ((BlobStoreRepository) repository);
 
@@ -148,12 +123,10 @@ public class CryptoTranslogFactory implements TranslogFactory {
                 startedPrimarySupplier,
                 remoteTranslogTransferTracker,
                 remoteStoreSettings,
-                translogOperationHelper,
                 keyResolver,
                 provider
             );
         } else {
-            // Create local translog with encryption
             return new CryptoTranslog(
                 config,
                 translogUUID,
@@ -161,7 +134,6 @@ public class CryptoTranslogFactory implements TranslogFactory {
                 globalCheckpointSupplier,
                 primaryTermSupplier,
                 persistedSequenceNumberConsumer,
-                translogOperationHelper,
                 keyResolver,
                 provider
             );

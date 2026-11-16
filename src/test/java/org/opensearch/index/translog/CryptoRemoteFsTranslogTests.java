@@ -5,7 +5,6 @@
 package org.opensearch.index.translog;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -29,8 +28,6 @@ import org.opensearch.common.blobstore.BlobStore;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.common.util.BigArrays;
-import org.opensearch.core.common.unit.ByteSizeUnit;
-import org.opensearch.core.common.unit.ByteSizeValue;
 import org.opensearch.core.index.Index;
 import org.opensearch.core.index.shard.ShardId;
 import org.opensearch.index.IndexSettings;
@@ -64,7 +61,6 @@ public class CryptoRemoteFsTranslogTests extends OpenSearchTestCase {
     private LongSupplier mockGlobalCheckpointSupplier;
     private LongSupplier mockPrimaryTermSupplier;
     private LongConsumer mockPersistedSequenceNumberConsumer;
-    private TranslogOperationHelper mockTranslogOperationHelper;
 
     @Override
     @SuppressForbidden(reason = "Creating temp directory for test purposes")
@@ -88,7 +84,7 @@ public class CryptoRemoteFsTranslogTests extends OpenSearchTestCase {
         mockBlobStoreRepository = mock(BlobStoreRepository.class);
         BlobStore mockBlobStore = mock(BlobStore.class);
         BlobContainer mockBlobContainer = mock(BlobContainer.class);
-        when(mockBlobStoreRepository.blobStore(anyBoolean())).thenReturn(mockBlobStore);
+        when(mockBlobStoreRepository.blobStore()).thenReturn(mockBlobStore);
         when(mockBlobStoreRepository.basePath()).thenReturn(BlobPath.cleanPath());
         when(mockBlobStore.blobContainer(any(BlobPath.class))).thenReturn(mockBlobContainer);
 
@@ -108,7 +104,6 @@ public class CryptoRemoteFsTranslogTests extends OpenSearchTestCase {
             return null;
         }).when(mockExecutor).execute(any(Runnable.class));
 
-        ByteSizeValue bufferSize = new ByteSizeValue(8, ByteSizeUnit.KB);
         Settings indexSettings = Settings
             .builder()
             .put(IndexMetadata.SETTING_REPLICATION_TYPE, ReplicationType.SEGMENT)
@@ -120,7 +115,6 @@ public class CryptoRemoteFsTranslogTests extends OpenSearchTestCase {
             tempDir,
             idxSettings,
             BigArrays.NON_RECYCLING_INSTANCE,
-            bufferSize,
             "test-node",
             false
         );
@@ -135,7 +129,6 @@ public class CryptoRemoteFsTranslogTests extends OpenSearchTestCase {
         mockGlobalCheckpointSupplier = () -> 0L;
         mockPrimaryTermSupplier = () -> 1L;
         mockPersistedSequenceNumberConsumer = seqNo -> {};
-        mockTranslogOperationHelper = mock(TranslogOperationHelper.class);
     }
 
     @Override
@@ -159,17 +152,13 @@ public class CryptoRemoteFsTranslogTests extends OpenSearchTestCase {
             mockStartedPrimarySupplier,
             mockRemoteTranslogTransferTracker,
             mockRemoteStoreSettings,
-            mockTranslogOperationHelper,
             keyResolver,
             SUN_JCE
         );
 
         assertNotNull("CryptoRemoteFsTranslog should be created successfully", translog);
 
-        // Verify the CryptoChannelFactory is set
-        Field channelFactoryField = Translog.class.getDeclaredField("channelFactory");
-        channelFactoryField.setAccessible(true);
-        ChannelFactory channelFactory = (ChannelFactory) channelFactoryField.get(translog);
+        ChannelFactory channelFactory = translog.getChannelFactory();
         assertNotNull("ChannelFactory should not be null", channelFactory);
         assertTrue("ChannelFactory should be instance of CryptoChannelFactory", channelFactory instanceof CryptoChannelFactory);
 
@@ -206,7 +195,6 @@ public class CryptoRemoteFsTranslogTests extends OpenSearchTestCase {
                 mockStartedPrimarySupplier,
                 mockRemoteTranslogTransferTracker,
                 mockRemoteStoreSettings,
-                mockTranslogOperationHelper,
                 null,  // Null keyResolver
                 SUN_JCE
             );
@@ -246,7 +234,6 @@ public class CryptoRemoteFsTranslogTests extends OpenSearchTestCase {
                 mockStartedPrimarySupplier,
                 mockRemoteTranslogTransferTracker,
                 mockRemoteStoreSettings,
-                mockTranslogOperationHelper,
                 keyResolver,
                 SUN_JCE
             );
@@ -280,7 +267,6 @@ public class CryptoRemoteFsTranslogTests extends OpenSearchTestCase {
             mockStartedPrimarySupplier,
             mockRemoteTranslogTransferTracker,
             mockRemoteStoreSettings,
-            mockTranslogOperationHelper,
             keyResolver,
             SUN_JCE
         );

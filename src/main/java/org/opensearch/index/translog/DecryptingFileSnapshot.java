@@ -13,13 +13,20 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.index.store.key.KeyResolver;
 import org.opensearch.index.translog.transfer.FileSnapshot;
+import org.opensearch.index.translog.transfer.FileSnapshot.TranslogFileSnapshot;
 
 /**
  * Wrapper for TranslogFileSnapshot that provides a decrypting input stream.
  *
+ * <p>OpenSearch 2.19 {@code FileSnapshot.TranslogFileSnapshot} is {@code final}, so this class
+ * extends the non-final {@link FileSnapshot.TransferFileSnapshot} parent and keeps generation
+ * on the wrapper. Callers that must pass a real {@code TranslogFileSnapshot} (2.19
+ * {@code TranslogTransferManager.prepareMetadata} checkcasts) should materialize decrypted
+ * bytes into a temp file instead of subclassing.
+ *
  * @opensearch.internal
  */
-public class DecryptingFileSnapshot extends FileSnapshot.TranslogFileSnapshot {
+public class DecryptingFileSnapshot extends FileSnapshot.TransferFileSnapshot {
 
     private static final Logger logger = LogManager.getLogger(DecryptingFileSnapshot.class);
 
@@ -27,6 +34,7 @@ public class DecryptingFileSnapshot extends FileSnapshot.TranslogFileSnapshot {
     private final KeyResolver keyResolver;
     private final String translogUUID;
     private final Provider provider;
+    private final long generation;
     private final Long decryptedLength;
 
     /**
@@ -41,9 +49,8 @@ public class DecryptingFileSnapshot extends FileSnapshot.TranslogFileSnapshot {
     public DecryptingFileSnapshot(TranslogFileSnapshot delegate, KeyResolver keyResolver, String translogUUID, Provider provider)
         throws IOException {
         super(
-            delegate.getPrimaryTerm(),
-            delegate.getGeneration(),
             delegate.getPath(),
+            delegate.getPrimaryTerm(),
             null  // Not passing checksum - decrypted content has different checksum
         );
 
@@ -51,6 +58,7 @@ public class DecryptingFileSnapshot extends FileSnapshot.TranslogFileSnapshot {
         this.keyResolver = keyResolver;
         this.translogUUID = translogUUID;
         this.provider = provider;
+        this.generation = delegate.getGeneration();
         Path path = delegate.getPath();
 
         if (path != null && path.getFileName().toString().endsWith(".tlog")) {
@@ -147,5 +155,13 @@ public class DecryptingFileSnapshot extends FileSnapshot.TranslogFileSnapshot {
     @Override
     public long getPrimaryTerm() {
         return delegate.getPrimaryTerm();
+    }
+
+    /**
+     * Generation of the wrapped translog snapshot. 2.19 {@code TranslogFileSnapshot} stores this
+     * on the final subclass; keep it here so materialization can copy it.
+     */
+    public long getGeneration() {
+        return generation;
     }
 }
