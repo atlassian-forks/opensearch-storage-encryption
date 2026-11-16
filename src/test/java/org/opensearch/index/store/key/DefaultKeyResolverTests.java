@@ -32,6 +32,9 @@ import org.junit.Before;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.opensearch.action.support.master.AcknowledgedResponse;
+import org.opensearch.client.AdminClient;
+import org.opensearch.client.Client;
+import org.opensearch.client.IndicesAdminClient;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.SuppressForbidden;
 import org.opensearch.common.action.ActionFuture;
@@ -42,9 +45,6 @@ import org.opensearch.index.store.CaffeineThreadLeakFilter;
 import org.opensearch.index.store.metrics.CryptoMetricsService;
 import org.opensearch.telemetry.metrics.MetricsRegistry;
 import org.opensearch.test.OpenSearchTestCase;
-import org.opensearch.client.AdminClient;
-import org.opensearch.client.Client;
-import org.opensearch.client.IndicesAdminClient;
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
 

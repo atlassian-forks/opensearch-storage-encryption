@@ -27,7 +27,8 @@ final class EngineConfigCopy {
      * Rebuild {@code config} with every 2.19 builder field copied, replacing only the translog factory.
      */
     static EngineConfig withTranslogFactory(EngineConfig config, TranslogFactory translogFactory) {
-        return new EngineConfig.Builder().shardId(config.getShardId())
+        return new EngineConfig.Builder()
+            .shardId(config.getShardId())
             .threadPool(config.getThreadPool())
             .indexSettings(config.getIndexSettings())
             .warmer(config.getWarmer())

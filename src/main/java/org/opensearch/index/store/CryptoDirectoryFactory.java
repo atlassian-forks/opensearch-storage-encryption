@@ -410,9 +410,8 @@ public class CryptoDirectoryFactory implements IndexStorePlugin.DirectoryFactory
         // Copy keyfile from source to target: copy to a temp file, fsync it, then atomically
         // rename it into place so a crash never leaves a partial keyfile behind. The temp name is
         // unique because several target shards may run this concurrently.
-        Path tempKeyfile = PrivilegedAccess.doPrivilegedIOException(
-            () -> Files.createTempFile(targetIndexDirectory, "keyfile.resize.", ".tmp")
-        );
+        Path tempKeyfile = PrivilegedAccess
+            .doPrivilegedIOException(() -> Files.createTempFile(targetIndexDirectory, "keyfile.resize.", ".tmp"));
         try {
             PrivilegedAccess.doPrivilegedIOException(() -> {
                 Files.copy(sourceKeyfile, tempKeyfile, StandardCopyOption.REPLACE_EXISTING);

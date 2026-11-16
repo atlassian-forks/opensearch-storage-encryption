@@ -30,8 +30,7 @@ public class CryptoDirectoryIntegTestCases extends OpenSearchIntegTestCase {
 
     @Override
     protected Collection<Class<? extends Plugin>> nodePlugins() {
-        return Arrays
-            .asList(CryptoDirectoryPlugin.class, MockCryptoKeyProviderPlugin.class, MockCryptoPlugin.class, ReindexPlugin.class);
+        return Arrays.asList(CryptoDirectoryPlugin.class, MockCryptoKeyProviderPlugin.class, MockCryptoPlugin.class, ReindexPlugin.class);
     }
 
     @Override

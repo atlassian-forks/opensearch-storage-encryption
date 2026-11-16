@@ -623,11 +623,7 @@ public class SnapshotRestoreIntegTests extends OpenSearchIntegTestCase {
         // Verify all data was restored correctly
         for (int i = 0; i < numIndices; i++) {
             SearchResponse response = client().prepareSearch("concurrent-index-" + i).setSize(0).get();
-            assertThat(
-                "Index " + i + " should have all documents",
-                response.getHits().getTotalHits().value,
-                equalTo((long) docsPerIndex)
-            );
+            assertThat("Index " + i + " should have all documents", response.getHits().getTotalHits().value, equalTo((long) docsPerIndex));
         }
 
         logger.info("Concurrent snapshots test completed successfully");

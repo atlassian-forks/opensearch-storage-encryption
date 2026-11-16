@@ -9,9 +9,9 @@ import static org.mockito.Mockito.mock;
 import static org.opensearch.rest.RestRequest.Method.POST;
 
 import org.junit.Before;
+import org.opensearch.client.node.NodeClient;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.test.OpenSearchTestCase;
-import org.opensearch.client.node.NodeClient;
 
 public class RestRegisterCryptoActionTests extends OpenSearchTestCase {
 

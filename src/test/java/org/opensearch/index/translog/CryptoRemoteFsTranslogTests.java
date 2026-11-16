@@ -110,14 +110,7 @@ public class CryptoRemoteFsTranslogTests extends OpenSearchTestCase {
             .put(IndexMetadata.SETTING_REMOTE_STORE_ENABLED, true)
             .build();
         IndexSettings idxSettings = IndexSettingsModule.newIndexSettings(testShardId.getIndex(), indexSettings);
-        mockConfig = new TranslogConfig(
-            testShardId,
-            tempDir,
-            idxSettings,
-            BigArrays.NON_RECYCLING_INSTANCE,
-            "test-node",
-            false
-        );
+        mockConfig = new TranslogConfig(testShardId, tempDir, idxSettings, BigArrays.NON_RECYCLING_INSTANCE, "test-node", false);
 
         mockDeletionPolicy = mock(TranslogDeletionPolicy.class);
         mockRemoteTranslogTransferTracker = mock(RemoteTranslogTransferTracker.class);
