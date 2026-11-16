@@ -91,8 +91,8 @@ I/O performance is enhanced through several optimization mechanisms. `ReadaheadM
 
 ## Requirements
 
-- **JDK**: 25
-- **OpenSearch**: 3.6.0-SNAPSHOT or compatible version
+- **JDK**: 21
+- **OpenSearch**: 2.19.6 or 2.19.6-compatible
 - **Master Key Provider**: Required for key management
 - **Operating System**: Linux recommended for Direct I/O features (io_uring)
 

@@ -236,7 +236,7 @@ public class UpdateConflictIntegTests extends OpenSearchIntegTestCase {
 
         refresh(indexName);
         SearchResponse afterMerge = client().prepareSearch(indexName).setSize(0).get();
-        assertThat("Should have docs after merge", afterMerge.getHits().getTotalHits().value(), greaterThan(0L));
+        assertThat("Should have docs after merge", afterMerge.getHits().getTotalHits().value, greaterThan(0L));
 
         assertThat("Corruption errors detected during workload", corruptionErrors.get(), equalTo(0));
     }

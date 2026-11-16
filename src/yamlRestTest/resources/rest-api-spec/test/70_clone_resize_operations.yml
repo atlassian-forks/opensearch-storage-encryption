@@ -1,8 +1,5 @@
 ---
 "Clone encrypted index and verify data integrity":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create source encrypted index
   - do:
@@ -135,9 +132,6 @@
 
 ---
 "Split encrypted index and verify data integrity":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create source encrypted index with single shard
   - do:
@@ -233,9 +227,6 @@
 
 ---
 "Shrink encrypted index and verify data integrity":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create source encrypted index with 2 shards
   - do:

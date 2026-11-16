@@ -1,8 +1,5 @@
 ---
 "Test encrypted index terms aggregation":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -114,9 +111,6 @@
 
 ---
 "Test encrypted index date_histogram aggregation":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -235,9 +229,6 @@
 
 ---
 "Test encrypted index range aggregation":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -395,9 +386,6 @@
 
 ---
 "Test encrypted index filters aggregation":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -520,9 +508,6 @@
 
 ---
 "Test encrypted index stats aggregation":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -650,9 +635,6 @@
 
 ---
 "Test encrypted index percentiles aggregation":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -746,9 +728,6 @@
 
 ---
 "Test encrypted index high-cardinality aggregation":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:

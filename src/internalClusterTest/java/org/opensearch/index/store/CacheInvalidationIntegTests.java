@@ -101,7 +101,7 @@ public class CacheInvalidationIntegTests extends OpenSearchIntegTestCase {
                 .prepareSearch("test-cache-invalidation")
                 .setQuery(org.opensearch.index.query.QueryBuilders.termQuery("number", i))
                 .get();
-            assertThat(response.getHits().getTotalHits().value(), equalTo(1L));
+            assertThat(response.getHits().getTotalHits().value, equalTo(1L));
         }
 
         // Get cache size before deletion
@@ -188,14 +188,14 @@ public class CacheInvalidationIntegTests extends OpenSearchIntegTestCase {
 
         // Verify index-2 still works perfectly
         SearchResponse response = client().prepareSearch("test-index-2").setSize(0).get();
-        assertThat("Index-2 should still have all documents", response.getHits().getTotalHits().value(), equalTo((long) numDocs));
+        assertThat("Index-2 should still have all documents", response.getHits().getTotalHits().value, equalTo((long) numDocs));
 
         // Can still read specific documents from index-2
         SearchResponse specificDoc = client()
             .prepareSearch("test-index-2")
             .setQuery(org.opensearch.index.query.QueryBuilders.termQuery("number", 5))
             .get();
-        assertThat("Should still be able to read from index-2", specificDoc.getHits().getTotalHits().value(), equalTo(1L));
+        assertThat("Should still be able to read from index-2", specificDoc.getHits().getTotalHits().value, equalTo(1L));
 
         // Cache should have some entries remaining (from index-2)
         long cacheSizeAfter = 0;
@@ -345,7 +345,7 @@ public class CacheInvalidationIntegTests extends OpenSearchIntegTestCase {
         refresh("test-metadata-cleanup-2");
 
         SearchResponse response = client().prepareSearch("test-metadata-cleanup-2").get();
-        assertThat(response.getHits().getTotalHits().value(), equalTo(1L));
+        assertThat(response.getHits().getTotalHits().value, equalTo(1L));
     }
 
     /**
@@ -405,14 +405,14 @@ public class CacheInvalidationIntegTests extends OpenSearchIntegTestCase {
 
         // Verify data is still accessible after reopening
         SearchResponse response = client().prepareSearch("test-close-cache").setSize(0).get();
-        assertThat("All documents should be accessible after reopen", response.getHits().getTotalHits().value(), equalTo((long) numDocs));
+        assertThat("All documents should be accessible after reopen", response.getHits().getTotalHits().value, equalTo((long) numDocs));
 
         // Read specific document to verify integrity
         SearchResponse specificDoc = client()
             .prepareSearch("test-close-cache")
             .setQuery(org.opensearch.index.query.QueryBuilders.termQuery("number", 10))
             .get();
-        assertThat("Should be able to read specific document after reopen", specificDoc.getHits().getTotalHits().value(), equalTo(1L));
+        assertThat("Should be able to read specific document after reopen", specificDoc.getHits().getTotalHits().value, equalTo(1L));
     }
 
     /**
@@ -552,7 +552,7 @@ public class CacheInvalidationIntegTests extends OpenSearchIntegTestCase {
             SearchResponse response = client().prepareSearch(indexNames[idx]).setSize(0).get();
             assertThat(
                 "Index " + indexNames[idx] + " should have all documents after reopen",
-                response.getHits().getTotalHits().value(),
+                response.getHits().getTotalHits().value,
                 equalTo((long) docsPerIndex)
             );
 
@@ -563,7 +563,7 @@ public class CacheInvalidationIntegTests extends OpenSearchIntegTestCase {
                 .get();
             assertThat(
                 "Index " + indexNames[idx] + " should have specific document after reopen",
-                specificDoc.getHits().getTotalHits().value(),
+                specificDoc.getHits().getTotalHits().value,
                 equalTo(1L)
             );
         }
@@ -643,7 +643,7 @@ public class CacheInvalidationIntegTests extends OpenSearchIntegTestCase {
                 .prepareSearch("test-fd-cache-delete")
                 .setQuery(org.opensearch.index.query.QueryBuilders.termQuery("number", i))
                 .get();
-            assertThat(response.getHits().getTotalHits().value(), equalTo(1L));
+            assertThat(response.getHits().getTotalHits().value, equalTo(1L));
         }
 
         FileChannelCache fdCache = CryptoDirectoryFactory.getSharedFileChannelCache();
@@ -721,7 +721,7 @@ public class CacheInvalidationIntegTests extends OpenSearchIntegTestCase {
 
         // Verify index-2 still works
         SearchResponse response = client().prepareSearch("test-fd-idx-2").setSize(0).get();
-        assertThat("Index-2 should still have all documents", response.getHits().getTotalHits().value(), equalTo((long) numDocs));
+        assertThat("Index-2 should still have all documents", response.getHits().getTotalHits().value, equalTo((long) numDocs));
     }
 
     /**
@@ -785,7 +785,7 @@ public class CacheInvalidationIntegTests extends OpenSearchIntegTestCase {
 
         // Verify data is still readable through the merged segment
         SearchResponse response = client().prepareSearch("test-fd-merge").setSize(0).get();
-        assertThat("All 100 documents should be readable after merge", response.getHits().getTotalHits().value(), equalTo(100L));
+        assertThat("All 100 documents should be readable after merge", response.getHits().getTotalHits().value, equalTo(100L));
 
         // The real invariant: deleting the index after merge should leave FD cache empty.
         // This proves no stale FDs leaked from the old segments.
@@ -859,7 +859,7 @@ public class CacheInvalidationIntegTests extends OpenSearchIntegTestCase {
         ensureGreen("test-fd-close");
 
         SearchResponse response = client().prepareSearch("test-fd-close").setSize(0).get();
-        assertThat("All documents should be accessible after reopen", response.getHits().getTotalHits().value(), equalTo((long) numDocs));
+        assertThat("All documents should be accessible after reopen", response.getHits().getTotalHits().value, equalTo((long) numDocs));
     }
 
     /**

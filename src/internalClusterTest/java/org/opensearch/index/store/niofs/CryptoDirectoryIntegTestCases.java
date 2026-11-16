@@ -14,7 +14,7 @@ import org.opensearch.action.search.SearchResponse;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.index.IndexNotFoundException;
 import org.opensearch.index.reindex.ReindexAction;
-import org.opensearch.index.reindex.ReindexModulePlugin;
+import org.opensearch.index.reindex.ReindexPlugin;
 import org.opensearch.index.reindex.ReindexRequestBuilder;
 import org.opensearch.index.store.CaffeineThreadLeakFilter;
 import org.opensearch.index.store.CryptoDirectoryPlugin;
@@ -31,7 +31,7 @@ public class CryptoDirectoryIntegTestCases extends OpenSearchIntegTestCase {
     @Override
     protected Collection<Class<? extends Plugin>> nodePlugins() {
         return Arrays
-            .asList(CryptoDirectoryPlugin.class, MockCryptoKeyProviderPlugin.class, MockCryptoPlugin.class, ReindexModulePlugin.class);
+            .asList(CryptoDirectoryPlugin.class, MockCryptoKeyProviderPlugin.class, MockCryptoPlugin.class, ReindexPlugin.class);
     }
 
     @Override
@@ -111,12 +111,12 @@ public class CryptoDirectoryIntegTestCases extends OpenSearchIntegTestCase {
         }
         refresh();
         SearchResponse response = client().prepareSearch("test").get();
-        assertThat(response.getHits().getTotalHits().value(), is(nbDocs));
+        assertThat(response.getHits().getTotalHits().value, is(nbDocs));
 
         // Reindex
         reindex().source("test").destination("test_copy").refresh(true).get();
         SearchResponse copy_response = client().prepareSearch("test_copy").get();
-        assertThat(copy_response.getHits().getTotalHits().value(), is(nbDocs));
+        assertThat(copy_response.getHits().getTotalHits().value, is(nbDocs));
 
     }
 
@@ -129,7 +129,7 @@ public class CryptoDirectoryIntegTestCases extends OpenSearchIntegTestCase {
         }
         refresh();
         SearchResponse response = client().prepareSearch("todelete").get();
-        assertThat(response.getHits().getTotalHits().value(), is(nbDocs));
+        assertThat(response.getHits().getTotalHits().value, is(nbDocs));
 
         // Deleteindex
         DeleteIndexRequest deleteIndexRequest = new DeleteIndexRequest("todelete");

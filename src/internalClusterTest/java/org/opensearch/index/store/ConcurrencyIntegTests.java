@@ -102,7 +102,7 @@ public class ConcurrencyIntegTests extends OpenSearchIntegTestCase {
 
         // Verify document count
         SearchResponse response1 = client().prepareSearch("test-multi-node").setSize(0).get();
-        assertThat(response1.getHits().getTotalHits().value(), equalTo((long) numDocs));
+        assertThat(response1.getHits().getTotalHits().value, equalTo((long) numDocs));
 
         // Get shard allocation info
         IndicesStatsResponse stats1 = client().admin().indices().prepareStats("test-multi-node").get();
@@ -132,7 +132,7 @@ public class ConcurrencyIntegTests extends OpenSearchIntegTestCase {
 
         // Verify data integrity after relocation
         SearchResponse response2 = client().prepareSearch("test-multi-node").setSize(0).get();
-        assertThat(response2.getHits().getTotalHits().value(), equalTo((long) numDocs));
+        assertThat(response2.getHits().getTotalHits().value, equalTo((long) numDocs));
 
         // Verify all shards are still functional
         IndicesStatsResponse stats2 = client().admin().indices().prepareStats("test-multi-node").get();
@@ -169,7 +169,7 @@ public class ConcurrencyIntegTests extends OpenSearchIntegTestCase {
 
         // Verify document count before restart
         SearchResponse response1 = client().prepareSearch("test-restart").setSize(0).get();
-        assertThat(response1.getHits().getTotalHits().value(), equalTo((long) numDocs));
+        assertThat(response1.getHits().getTotalHits().value, equalTo((long) numDocs));
 
         // Restart one node (non-master)
         String[] nodeNames = internalCluster().getNodeNames();
@@ -187,7 +187,7 @@ public class ConcurrencyIntegTests extends OpenSearchIntegTestCase {
 
         // Verify data is still accessible after restart
         SearchResponse response2 = client().prepareSearch("test-restart").setSize(0).get();
-        assertThat(response2.getHits().getTotalHits().value(), equalTo((long) numDocs));
+        assertThat(response2.getHits().getTotalHits().value, equalTo((long) numDocs));
 
         // Verify we can still write after restart
         int additionalDocs = randomIntBetween(50, 100);
@@ -197,7 +197,7 @@ public class ConcurrencyIntegTests extends OpenSearchIntegTestCase {
         refresh();
 
         SearchResponse response3 = client().prepareSearch("test-restart").setSize(0).get();
-        assertThat(response3.getHits().getTotalHits().value(), equalTo((long) (numDocs + additionalDocs)));
+        assertThat(response3.getHits().getTotalHits().value, equalTo((long) (numDocs + additionalDocs)));
     }
 
     // ==================== P2: Concurrent Index Creation ====================
@@ -265,7 +265,7 @@ public class ConcurrencyIntegTests extends OpenSearchIntegTestCase {
             for (int i = 0; i < numIndices; i++) {
                 String indexName = "concurrent-test-" + i;
                 SearchResponse response = client().prepareSearch(indexName).setSize(0).get();
-                assertThat(response.getHits().getTotalHits().value(), equalTo(10L));
+                assertThat(response.getHits().getTotalHits().value, equalTo(10L));
             }
 
         } finally {
@@ -302,7 +302,7 @@ public class ConcurrencyIntegTests extends OpenSearchIntegTestCase {
         refresh();
 
         SearchResponse response = client().prepareSearch("test-large-docs").setSize(0).get();
-        assertThat(response.getHits().getTotalHits().value(), equalTo((long) numDocs));
+        assertThat(response.getHits().getTotalHits().value, equalTo((long) numDocs));
     }
 
     // ==================== P2: Translog Encryption Integration ====================
@@ -378,7 +378,7 @@ public class ConcurrencyIntegTests extends OpenSearchIntegTestCase {
         SearchResponse response2 = client().prepareSearch("test-translog").setSize(0).get();
         assertThat(
             "All documents should be recovered from encrypted translog",
-            response2.getHits().getTotalHits().value(),
+            response2.getHits().getTotalHits().value,
             equalTo((long) numDocs)
         );
 
@@ -388,7 +388,7 @@ public class ConcurrencyIntegTests extends OpenSearchIntegTestCase {
             .prepareSearch("test-translog")
             .setQuery(org.opensearch.index.query.QueryBuilders.termQuery("number", randomDoc))
             .get();
-        assertThat("Should be able to read specific documents after recovery", specificDoc.getHits().getTotalHits().value(), equalTo(1L));
+        assertThat("Should be able to read specific documents after recovery", specificDoc.getHits().getTotalHits().value, equalTo(1L));
 
         // Verify we can retrieve all documents
         SearchResponse response3 = client()
@@ -413,7 +413,7 @@ public class ConcurrencyIntegTests extends OpenSearchIntegTestCase {
         SearchResponse response4 = client().prepareSearch("test-translog").setSize(0).get();
         assertThat(
             "Should be able to write new documents after recovery",
-            response4.getHits().getTotalHits().value(),
+            response4.getHits().getTotalHits().value,
             equalTo((long) (numDocs + additionalDocs))
         );
 
@@ -458,7 +458,7 @@ public class ConcurrencyIntegTests extends OpenSearchIntegTestCase {
         // Verify all indices are functional
         for (String indexName : indexNames) {
             SearchResponse response = client().prepareSearch(indexName).setSize(0).get();
-            assertThat(response.getHits().getTotalHits().value(), equalTo(50L));
+            assertThat(response.getHits().getTotalHits().value, equalTo(50L));
         }
 
         // Delete one index
@@ -472,7 +472,7 @@ public class ConcurrencyIntegTests extends OpenSearchIntegTestCase {
         // Verify other indices still work (keys not affected)
         for (int i = 1; i < numIndices; i++) {
             SearchResponse response = client().prepareSearch(indexNames[i]).setSize(0).get();
-            assertThat(response.getHits().getTotalHits().value(), equalTo(50L));
+            assertThat(response.getHits().getTotalHits().value, equalTo(50L));
 
             // Verify we can still write
             index(indexNames[i], "_doc", "new", "field", "newvalue");
@@ -482,7 +482,7 @@ public class ConcurrencyIntegTests extends OpenSearchIntegTestCase {
 
         for (int i = 1; i < numIndices; i++) {
             SearchResponse response = client().prepareSearch(indexNames[i]).setSize(0).get();
-            assertThat(response.getHits().getTotalHits().value(), equalTo(51L));
+            assertThat(response.getHits().getTotalHits().value, equalTo(51L));
         }
     }
 
@@ -530,7 +530,7 @@ public class ConcurrencyIntegTests extends OpenSearchIntegTestCase {
         index("test-dummy-kms", "_doc", "1", "field", "value");
         refresh();
         SearchResponse response = client().prepareSearch("test-dummy-kms").get();
-        assertThat(response.getHits().getTotalHits().value(), equalTo(1L));
+        assertThat(response.getHits().getTotalHits().value, equalTo(1L));
     }
 
     // ==================== P3: Segment Merges with Encryption ====================
@@ -569,7 +569,7 @@ public class ConcurrencyIntegTests extends OpenSearchIntegTestCase {
 
         // Verify document count before merge
         SearchResponse responseBefore = client().prepareSearch("test-merges").setSize(0).get();
-        assertThat(responseBefore.getHits().getTotalHits().value(), equalTo((long) numDocs));
+        assertThat(responseBefore.getHits().getTotalHits().value, equalTo((long) numDocs));
 
         // Get segment count before merge
         IndicesStatsResponse statsBefore = client().admin().indices().prepareStats("test-merges").get();
@@ -597,14 +597,14 @@ public class ConcurrencyIntegTests extends OpenSearchIntegTestCase {
 
         // Verify data integrity after merge
         SearchResponse responseAfter = client().prepareSearch("test-merges").setSize(0).get();
-        assertThat(responseAfter.getHits().getTotalHits().value(), equalTo((long) numDocs));
+        assertThat(responseAfter.getHits().getTotalHits().value, equalTo((long) numDocs));
 
         // Verify we can still read specific documents
         SearchResponse sampleDoc = client()
             .prepareSearch("test-merges")
             .setQuery(org.opensearch.index.query.QueryBuilders.termQuery("number", 42))
             .get();
-        assertThat(sampleDoc.getHits().getTotalHits().value(), greaterThan(0L));
+        assertThat(sampleDoc.getHits().getTotalHits().value, greaterThan(0L));
     }
 
     // ==================== Concurrency Tests ====================
@@ -658,7 +658,7 @@ public class ConcurrencyIntegTests extends OpenSearchIntegTestCase {
                                 .setQuery(org.opensearch.index.query.QueryBuilders.termQuery("number", docId))
                                 .get();
 
-                            if (response.getHits().getTotalHits().value() == 1) {
+                            if (response.getHits().getTotalHits().value == 1) {
                                 successCount.incrementAndGet();
                             }
                         }
@@ -759,7 +759,7 @@ public class ConcurrencyIntegTests extends OpenSearchIntegTestCase {
             // Refresh and verify all documents indexed
             refresh();
             SearchResponse response = client().prepareSearch("test-concurrent-writes").setSize(0).get();
-            assertThat(response.getHits().getTotalHits().value(), equalTo((long) (numThreads * docsPerThread)));
+            assertThat(response.getHits().getTotalHits().value, equalTo((long) (numThreads * docsPerThread)));
 
         } finally {
             executor.shutdown();
@@ -816,7 +816,7 @@ public class ConcurrencyIntegTests extends OpenSearchIntegTestCase {
                                 .setSize(10)
                                 .get();
 
-                            if (response.getHits().getTotalHits().value() > 0) {
+                            if (response.getHits().getTotalHits().value > 0) {
                                 readSuccess.incrementAndGet();
                             }
 
@@ -874,7 +874,7 @@ public class ConcurrencyIntegTests extends OpenSearchIntegTestCase {
             // Final verification
             refresh();
             SearchResponse finalResponse = client().prepareSearch("test-concurrent-mixed").setSize(0).get();
-            assertThat(finalResponse.getHits().getTotalHits().value(), equalTo((long) (initialDocs + numWriters * 50)));
+            assertThat(finalResponse.getHits().getTotalHits().value, equalTo((long) (initialDocs + numWriters * 50)));
 
         } finally {
             executor.shutdown();
@@ -958,7 +958,7 @@ public class ConcurrencyIntegTests extends OpenSearchIntegTestCase {
             // Verify index is still functional
             refresh();
             SearchResponse finalResponse = client().prepareSearch("test-concurrent-shards").setSize(0).get();
-            assertThat(finalResponse.getHits().getTotalHits().value(), greaterThan(0L));
+            assertThat(finalResponse.getHits().getTotalHits().value, greaterThan(0L));
 
         } finally {
             executor.shutdown();
@@ -1018,7 +1018,7 @@ public class ConcurrencyIntegTests extends OpenSearchIntegTestCase {
                                     .setQuery(org.opensearch.index.query.QueryBuilders.termQuery("number", startDoc))
                                     .get();
 
-                                if (response.getHits().getTotalHits().value() > 0) {
+                                if (response.getHits().getTotalHits().value > 0) {
                                     successfulReads.incrementAndGet();
                                 }
                             }
@@ -1128,7 +1128,7 @@ public class ConcurrencyIntegTests extends OpenSearchIntegTestCase {
             // Verify document count
             refresh();
             SearchResponse response = client().prepareSearch("test-concurrent-bulk").setSize(0).get();
-            assertThat(response.getHits().getTotalHits().value(), equalTo((long) (numThreads * bulksPerThread * docsPerBulk)));
+            assertThat(response.getHits().getTotalHits().value, equalTo((long) (numThreads * bulksPerThread * docsPerBulk)));
 
         } finally {
             executor.shutdown();

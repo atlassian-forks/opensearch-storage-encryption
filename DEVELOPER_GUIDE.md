@@ -53,7 +53,7 @@ For a complete development environment:
 
 ```bash
 # Set up required variables
-OPENSEARCH_VERSION="3.3.0-SNAPSHOT"
+OPENSEARCH_VERSION="2.19.6"
 BASE_DIR="$(pwd)"
 OPENSEARCH_DIR="${BASE_DIR}/OpenSearch"
 STORAGE_ENCRYPTION_DIR="${BASE_DIR}/opensearch-storage-encryption"
@@ -344,7 +344,7 @@ For performance analysis:
 
 #### Plugin Installation Fails
 - **Cause**: Version mismatch between OpenSearch and plugin
-- **Solution**: Ensure compatible versions between OpenSearch and Plugin version (Example: both being on `3.3.0-SNAPSHOT`)
+- **Solution**: Ensure compatible versions between OpenSearch and Plugin version (Example: both being on `2.19.6`)
 
 #### KMS Integration Issues
 - **Cause**: Invalid AWS credentials or permissions

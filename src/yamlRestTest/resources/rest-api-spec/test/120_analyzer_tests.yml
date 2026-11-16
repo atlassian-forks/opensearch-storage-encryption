@@ -1,8 +1,5 @@
 ---
 "Test built-in analyzer parity using custom analyzers on encrypted index":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index with safe custom analyzers
   - do:

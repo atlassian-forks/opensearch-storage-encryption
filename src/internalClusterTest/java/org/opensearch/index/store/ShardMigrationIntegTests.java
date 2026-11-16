@@ -102,7 +102,7 @@ public class ShardMigrationIntegTests extends OpenSearchIntegTestCase {
 
         // Verify initial document count
         SearchResponse response1 = client().prepareSearch("test-shard-relocation").setSize(0).get();
-        assertThat(response1.getHits().getTotalHits().value(), equalTo((long) numDocs));
+        assertThat(response1.getHits().getTotalHits().value, equalTo((long) numDocs));
 
         // Get initial shard locations
         IndicesStatsResponse statsBeforeRelocation = client().admin().indices().prepareStats("test-shard-relocation").get();
@@ -166,7 +166,7 @@ public class ShardMigrationIntegTests extends OpenSearchIntegTestCase {
                 SearchResponse response2 = client().prepareSearch("test-shard-relocation").setSize(0).get();
                 assertThat(
                     "Document count should remain same after relocation",
-                    response2.getHits().getTotalHits().value(),
+                    response2.getHits().getTotalHits().value,
                     equalTo((long) finalNumDocs)
                 );
 
@@ -175,7 +175,7 @@ public class ShardMigrationIntegTests extends OpenSearchIntegTestCase {
                     .prepareSearch("test-shard-relocation")
                     .setQuery(org.opensearch.index.query.QueryBuilders.termQuery("number", randomDoc))
                     .get();
-                assertThat(specificDoc.getHits().getTotalHits().value(), equalTo(1L));
+                assertThat(specificDoc.getHits().getTotalHits().value, equalTo(1L));
             }, 30, TimeUnit.SECONDS);
 
             // Verify we can still write after relocation - with retry for encryption key availability
@@ -187,7 +187,7 @@ public class ShardMigrationIntegTests extends OpenSearchIntegTestCase {
                 refresh();
 
                 SearchResponse response3 = client().prepareSearch("test-shard-relocation").setSize(0).get();
-                assertThat(response3.getHits().getTotalHits().value(), equalTo((long) (finalNumDocs + newDocs)));
+                assertThat(response3.getHits().getTotalHits().value, equalTo((long) (finalNumDocs + newDocs)));
             }, 30, TimeUnit.SECONDS);
         } else {
             logger.info("No relocation performed - shards already optimally distributed");
@@ -224,7 +224,7 @@ public class ShardMigrationIntegTests extends OpenSearchIntegTestCase {
 
         // Verify initial state
         SearchResponse response1 = client().prepareSearch("test-replica-recovery").setSize(0).get();
-        assertThat(response1.getHits().getTotalHits().value(), equalTo((long) numDocs));
+        assertThat(response1.getHits().getTotalHits().value, equalTo((long) numDocs));
 
         // Restart one data node (non-cluster-manager) to force replica recovery
         String clusterManager = internalCluster().getClusterManagerName();
@@ -257,7 +257,7 @@ public class ShardMigrationIntegTests extends OpenSearchIntegTestCase {
             SearchResponse response2 = client().prepareSearch("test-replica-recovery").setSize(0).get();
             assertThat(
                 "All documents should be accessible after node restart",
-                response2.getHits().getTotalHits().value(),
+                response2.getHits().getTotalHits().value,
                 equalTo((long) finalNumDocs)
             );
         }, 30, TimeUnit.SECONDS);
@@ -271,7 +271,7 @@ public class ShardMigrationIntegTests extends OpenSearchIntegTestCase {
             refresh();
 
             SearchResponse response3 = client().prepareSearch("test-replica-recovery").setSize(0).get();
-            assertThat(response3.getHits().getTotalHits().value(), equalTo((long) (finalNumDocs + newDocs)));
+            assertThat(response3.getHits().getTotalHits().value, equalTo((long) (finalNumDocs + newDocs)));
         }, 30, TimeUnit.SECONDS);
     }
 
@@ -326,7 +326,7 @@ public class ShardMigrationIntegTests extends OpenSearchIntegTestCase {
                                         .setQuery(org.opensearch.index.query.QueryBuilders.matchAllQuery())
                                         .setSize(10)
                                         .get();
-                                    if (response.getHits().getTotalHits().value() > 0) {
+                                    if (response.getHits().getTotalHits().value > 0) {
                                         successfulOps.incrementAndGet();
                                     }
                                 } else {
@@ -413,7 +413,7 @@ public class ShardMigrationIntegTests extends OpenSearchIntegTestCase {
             SearchResponse finalResponse = client().prepareSearch("test-migration-concurrent").setSize(0).get();
             assertThat(
                 "Final document count should include all writes",
-                finalResponse.getHits().getTotalHits().value(),
+                finalResponse.getHits().getTotalHits().value,
                 greaterThanOrEqualTo((long) initialDocs)
             );
 
@@ -455,7 +455,7 @@ public class ShardMigrationIntegTests extends OpenSearchIntegTestCase {
 
         // Verify initial state
         SearchResponse response1 = client().prepareSearch("test-replica-sync").setSize(0).get();
-        assertThat(response1.getHits().getTotalHits().value(), equalTo((long) numDocs));
+        assertThat(response1.getHits().getTotalHits().value, equalTo((long) numDocs));
 
         // Restart a non-cluster-manager node
         String clusterManager = internalCluster().getClusterManagerName();
@@ -495,7 +495,7 @@ public class ShardMigrationIntegTests extends OpenSearchIntegTestCase {
         SearchResponse response2 = client().prepareSearch("test-replica-sync").setSize(0).get();
         assertThat(
             "All documents should be present after replica recovery",
-            response2.getHits().getTotalHits().value(),
+            response2.getHits().getTotalHits().value,
             greaterThanOrEqualTo((long) numDocs)
         );
 
@@ -504,7 +504,7 @@ public class ShardMigrationIntegTests extends OpenSearchIntegTestCase {
             .prepareSearch("test-replica-sync")
             .setQuery(org.opensearch.index.query.QueryBuilders.termQuery("number", 0))
             .get();
-        assertThat(specificDoc.getHits().getTotalHits().value(), equalTo(1L));
+        assertThat(specificDoc.getHits().getTotalHits().value, equalTo(1L));
 
         logger.info("Replica recovery with data changes test completed successfully");
     }

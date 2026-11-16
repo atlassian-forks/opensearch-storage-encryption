@@ -1,8 +1,5 @@
 ---
 "Test encrypted index basic snapshot and restore":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Register snapshot repository
   - do:
@@ -167,9 +164,6 @@
 
 ---
 "Test encrypted index partial restore":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Register snapshot repository
   - do:
@@ -299,9 +293,6 @@
 
 ---
 "Test encrypted index restore with rename":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Register snapshot repository
   - do:
@@ -411,9 +402,6 @@
 
 ---
 "Test encrypted index incremental snapshots":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Register snapshot repository
   - do:
@@ -557,9 +545,6 @@
 
 ---
 "Test multiple encrypted indices in single snapshot":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Register snapshot repository
   - do:
@@ -734,9 +719,6 @@
 
 ---
 "Test snapshot status and metadata for encrypted index":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Register snapshot repository
   - do:

@@ -1,8 +1,5 @@
 ---
 "Test _cat/indices API with encrypted indices":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   - do:
       indices.create:
@@ -53,9 +50,6 @@
 
 ---
 "Test _cat/recovery API with encrypted indices":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   - do:
       indices.create:
@@ -104,9 +98,6 @@
 
 ---
 "Test _cat/nodes API":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   - do:
       cat.nodes:
@@ -118,9 +109,6 @@
 
 ---
 "Test _stats API with encrypted indices":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   - do:
       indices.create:
@@ -154,9 +142,6 @@
 
 ---
 "Test _segments API with encrypted indices":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   - do:
       indices.create:
@@ -189,9 +174,6 @@
 
 ---
 "Test _cluster/stats API with encrypted indices":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   - do:
       indices.create:
