@@ -21,6 +21,7 @@ import java.util.Objects;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.common.SuppressForbidden;
+import org.opensearch.index.store.PrivilegedAccess;
 
 /**
  * Provides native bindings to OpenSSL EVP_aes_256_ctr using the Java Panama FFI.
@@ -50,25 +51,22 @@ public final class OpenSslNativeCipher {
     public static final MethodHandle EVP_aes_256_gcm;
 
     /**
-     * {@code EVP_EncryptUpdate} bound as a critical downcall that may take Java heap segments, so
-     * {@link #encryptUpdate(MemorySegment, byte[], int, byte[], int, int)} reads and writes the caller's
-     * arrays directly instead of copying them through native memory.
-     */
-    private static final MethodHandle EVP_EncryptUpdate_HEAP;
-
-    /**
-     * Largest number of bytes passed to one critical {@code EVP_EncryptUpdate} call. Garbage collection
-     * waits for a critical call to return, so large writes are split to keep that wait in the microseconds.
+     * Largest number of bytes copied through a native staging buffer for one {@code EVP_EncryptUpdate}
+     * call. JDK 21 downcalls cannot take heap {@link MemorySegment}s, so large writes are split.
      */
     public static final int MAX_HEAP_UPDATE_SIZE = 64 * 1024;
 
     public static final int EVP_CTRL_GCM_GET_TAG = 0x10;
     public static final int EVP_CTRL_GCM_SET_TAG = 0x11;
 
-    private static final Linker LINKER = Linker.nativeLinker();
+    private static final Linker LINKER = PrivilegedAccess.doPrivileged(Linker::nativeLinker);
     private static final SymbolLookup LIBCRYPTO = loadLibcrypto();
 
     private static SymbolLookup loadLibcrypto() {
+        return PrivilegedAccess.doPrivileged(() -> loadLibcryptoUnprivileged());
+    }
+
+    private static SymbolLookup loadLibcryptoUnprivileged() {
         String os = System.getProperty("os.name").toLowerCase(Locale.ROOT);
 
         if (os.contains("mac")) {
@@ -169,8 +167,6 @@ public final class OpenSslNativeCipher {
                     ValueLayout.JAVA_INT // inLen
                 );
             EVP_EncryptUpdate = LINKER.downcallHandle(LIBCRYPTO.find("EVP_EncryptUpdate").orElseThrow(), encryptUpdate);
-            EVP_EncryptUpdate_HEAP = LINKER
-                .downcallHandle(LIBCRYPTO.find("EVP_EncryptUpdate").orElseThrow(), encryptUpdate, Linker.Option.critical(true));
 
             EVP_aes_256_ctr = LINKER
                 .downcallHandle(LIBCRYPTO.find("EVP_aes_256_ctr").orElseThrow(), FunctionDescriptor.of(ValueLayout.ADDRESS));
@@ -270,8 +266,8 @@ public final class OpenSslNativeCipher {
                 }
 
                 byte[] adjustedIV = computeOffsetIVForAesGcmEncrypted(iv, filePosition);
-                MemorySegment keySeg = arena.allocateFrom(ValueLayout.JAVA_BYTE, key);
-                MemorySegment ivSeg = arena.allocateFrom(ValueLayout.JAVA_BYTE, adjustedIV);
+                MemorySegment keySeg = allocateBytes(arena, key);
+                MemorySegment ivSeg = allocateBytes(arena, adjustedIV);
 
                 int rc = (int) EVP_EncryptInit_ex.invoke(ctx, cipher, MemorySegment.NULL, keySeg, ivSeg);
                 if (rc != 1) {
@@ -281,13 +277,13 @@ public final class OpenSslNativeCipher {
 
                 int skipBytes = (int) (filePosition & (AES_BLOCK_SIZE - 1));
                 if (skipBytes > 0) {
-                    MemorySegment dummyIn = arena.allocateFrom(ValueLayout.JAVA_BYTE, new byte[skipBytes]);
+                    MemorySegment dummyIn = allocateBytes(arena, new byte[skipBytes]);
                     MemorySegment dummyOut = arena.allocate(skipBytes + AES_BLOCK_SIZE, 1);
                     MemorySegment dummyLen = arena.allocate(ValueLayout.JAVA_INT);
                     EVP_EncryptUpdate.invoke(ctx, dummyOut, dummyLen, dummyIn, skipBytes);
                 }
 
-                MemorySegment inSeg = arena.allocateFrom(ValueLayout.JAVA_BYTE, input);
+                MemorySegment inSeg = allocateBytes(arena, input);
                 MemorySegment outSeg = arena.allocate(input.length, 1);
                 MemorySegment outLen = arena.allocate(ValueLayout.JAVA_INT);
 
@@ -333,8 +329,8 @@ public final class OpenSslNativeCipher {
         System.arraycopy(iv, 0, gcmIV, 0, 12);
 
         try (Arena arena = Arena.ofConfined()) {
-            MemorySegment keySeg = arena.allocateFrom(ValueLayout.JAVA_BYTE, key);
-            MemorySegment ivSeg = arena.allocateFrom(ValueLayout.JAVA_BYTE, gcmIV);
+            MemorySegment keySeg = allocateBytes(arena, key);
+            MemorySegment ivSeg = allocateBytes(arena, gcmIV);
 
             int rc = (int) EVP_EncryptInit_ex.invoke(ctx, cipher, MemorySegment.NULL, keySeg, ivSeg);
             if (rc != 1) {
@@ -351,9 +347,10 @@ public final class OpenSslNativeCipher {
      * {@code outOffset}, using an initialized GCM cipher context. AES-GCM produces exactly one byte of
      * ciphertext per byte of plaintext on update, so {@code out} must have {@code length} bytes free.
      *
-     * <p>The arrays are passed to OpenSSL directly (no native staging buffer, no allocation). Input is fed
-     * in pieces of at most {@link #MAX_HEAP_UPDATE_SIZE} bytes. {@code in} and {@code out} may be the same
-     * range (in-place encryption); otherwise the two ranges must not overlap.
+     * <p>JDK 21 Panama downcalls cannot take heap {@link MemorySegment}s, so each chunk is copied through
+     * a native staging buffer. Input is fed in pieces of at most {@link #MAX_HEAP_UPDATE_SIZE} bytes.
+     * {@code in} and {@code out} may be the same range (in-place encryption); otherwise the two ranges
+     * must not overlap.
      *
      * @param ctx       the GCM context from {@link #initGCMCipher(byte[], byte[], long)}
      * @param in        plaintext
@@ -371,23 +368,27 @@ public final class OpenSslNativeCipher {
             // OpenSSL allows in-place encryption (same start) but requires distinct ranges to be disjoint.
             throw new IllegalArgumentException("Input and output ranges overlap without starting at the same offset");
         }
-        MemorySegment inSeg = MemorySegment.ofArray(in);
-        MemorySegment outSeg = MemorySegment.ofArray(out);
-        int[] outLen = new int[1];
-        MemorySegment outLenSeg = MemorySegment.ofArray(outLen);
-        int done = 0;
-        while (done < length) {
-            int n = Math.min(length - done, MAX_HEAP_UPDATE_SIZE);
-            int rc = (int) EVP_EncryptUpdate_HEAP
-                .invokeExact(ctx, outSeg.asSlice(outOffset + done, n), outLenSeg, inSeg.asSlice(inOffset + done, n), n);
-            if (rc != 1) {
-                LOGGER.error("EVP_EncryptUpdate failed in streaming mode with return code: {}", rc);
-                throw new OpenSslException("EVP_EncryptUpdate failed");
+        try (Arena arena = Arena.ofConfined()) {
+            int cap = Math.min(length, MAX_HEAP_UPDATE_SIZE);
+            MemorySegment inSeg = arena.allocate(cap);
+            MemorySegment outSeg = arena.allocate(cap);
+            MemorySegment outLenSeg = arena.allocate(ValueLayout.JAVA_INT);
+            int done = 0;
+            while (done < length) {
+                int n = Math.min(length - done, MAX_HEAP_UPDATE_SIZE);
+                MemorySegment.copy(in, inOffset + done, inSeg, ValueLayout.JAVA_BYTE, 0, n);
+                int rc = (int) EVP_EncryptUpdate.invoke(ctx, outSeg, outLenSeg, inSeg, n);
+                if (rc != 1) {
+                    LOGGER.error("EVP_EncryptUpdate failed in streaming mode with return code: {}", rc);
+                    throw new OpenSslException("EVP_EncryptUpdate failed");
+                }
+                int written = outLenSeg.get(ValueLayout.JAVA_INT, 0);
+                if (written != n) {
+                    throw new OpenSslException("EVP_EncryptUpdate wrote " + written + " bytes for " + n + " bytes of input");
+                }
+                MemorySegment.copy(outSeg, ValueLayout.JAVA_BYTE, 0, out, outOffset + done, n);
+                done += n;
             }
-            if (outLen[0] != n) {
-                throw new OpenSslException("EVP_EncryptUpdate wrote " + outLen[0] + " bytes for " + n + " bytes of input");
-            }
-            done += n;
         }
     }
 
@@ -449,8 +450,8 @@ public final class OpenSslNativeCipher {
                 byte[] gcmIV = new byte[12];
                 System.arraycopy(iv, 0, gcmIV, 0, 12);
 
-                MemorySegment keySeg = arena.allocateFrom(ValueLayout.JAVA_BYTE, key);
-                MemorySegment ivSeg = arena.allocateFrom(ValueLayout.JAVA_BYTE, gcmIV);
+                MemorySegment keySeg = allocateBytes(arena, key);
+                MemorySegment ivSeg = allocateBytes(arena, gcmIV);
 
                 int rc = (int) EVP_DecryptInit_ex.invoke(ctx, cipher, MemorySegment.NULL, keySeg, ivSeg);
                 if (rc != 1) {
@@ -459,7 +460,7 @@ public final class OpenSslNativeCipher {
                 }
 
                 int dataLen = ciphertext.length - 16;
-                MemorySegment inSeg = arena.allocateFrom(ValueLayout.JAVA_BYTE, ciphertext);
+                MemorySegment inSeg = allocateBytes(arena, ciphertext);
                 MemorySegment outSeg = arena.allocate(dataLen, 1);
                 MemorySegment outLen = arena.allocate(ValueLayout.JAVA_INT);
 
@@ -471,7 +472,7 @@ public final class OpenSslNativeCipher {
 
                 byte[] tag = new byte[16];
                 System.arraycopy(ciphertext, dataLen, tag, 0, 16);
-                MemorySegment tagSeg = arena.allocateFrom(ValueLayout.JAVA_BYTE, tag);
+                MemorySegment tagSeg = allocateBytes(arena, tag);
 
                 rc = (int) EVP_CIPHER_CTX_ctrl.invoke(ctx, EVP_CTRL_GCM_SET_TAG, 16, tagSeg);
                 if (rc != 1) {
@@ -503,6 +504,13 @@ public final class OpenSslNativeCipher {
             // Log but don't throw - this is cleanup code
             LOGGER.warn("Failed to free OpenSSL cipher context", ex);
         }
+    }
+
+    /** Java 21 allocate-and-copy for a byte array (Java 22 Arena allocateFrom bytes). */
+    private static MemorySegment allocateBytes(Arena arena, byte[] bytes) {
+        MemorySegment segment = arena.allocate(bytes.length);
+        MemorySegment.copy(bytes, 0, segment, ValueLayout.JAVA_BYTE, 0, bytes.length);
+        return segment;
     }
 
     /**
