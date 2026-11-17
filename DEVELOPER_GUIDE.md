@@ -4,7 +4,7 @@ This guide helps developers get started with building and testing the OpenSearch
 
 ## Prerequisites
 
-1. **JDK 21** or higher (Note: Code uses preview features that are patched at build time)
+1. **JDK 21** (required). Panama FFM is a preview API on 21, so plugin class files only load on JDK 21 and only when the JVM is started with `--enable-preview` and `--enable-native-access=ALL-UNNAMED`. On JDK 22+ FFM is final; those flags and the JDK 21 call forms are not needed on the 3.x/main line.
 
 2. Gradle (included via wrapper)
 
@@ -132,6 +132,9 @@ add_jvm_option() {
 
 # Add required JVM options
 add_jvm_option "-XX:MaxDirectMemorySize=${JVM_DIRECT_MEM_SIZE}"
+# JDK 21 preview FFM: plugin classes will not load without --enable-preview.
+add_jvm_option "--enable-preview"
+add_jvm_option "--enable-native-access=ALL-UNNAMED"
 ```
 
 ## Running and Testing OpenSearch
