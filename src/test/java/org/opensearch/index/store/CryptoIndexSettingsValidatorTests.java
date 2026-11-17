@@ -4,6 +4,7 @@
  */
 package org.opensearch.index.store;
 
+import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.index.IndexModule;
 import org.opensearch.test.OpenSearchTestCase;
@@ -234,6 +235,32 @@ public class CryptoIndexSettingsValidatorTests extends OpenSearchTestCase {
             .builder()
             .put(IndexModule.INDEX_STORE_TYPE_SETTING.getKey(), "cryptofs")
             .put(CryptoDirectoryFactory.INDEX_KEY_PROVIDER_SETTING.getKey(), "dummy")
+            .build();
+
+        CryptoIndexSettingsValidator.validate(settings);
+    }
+
+    public void testRemoteStoreRejectedForCryptofs() {
+        Settings settings = Settings
+            .builder()
+            .put(IndexModule.INDEX_STORE_TYPE_SETTING.getKey(), "cryptofs")
+            .put(CryptoDirectoryFactory.INDEX_KEY_PROVIDER_SETTING.getKey(), "dummy")
+            .put(IndexMetadata.SETTING_REMOTE_STORE_ENABLED, true)
+            .build();
+
+        IllegalArgumentException exception = expectThrows(
+            IllegalArgumentException.class,
+            () -> CryptoIndexSettingsValidator.validate(settings)
+        );
+
+        assertTrue(exception.getMessage().contains("does not support remote store"));
+    }
+
+    public void testRemoteStoreAllowedForNonCryptofs() {
+        Settings settings = Settings
+            .builder()
+            .put(IndexModule.INDEX_STORE_TYPE_SETTING.getKey(), "niofs")
+            .put(IndexMetadata.SETTING_REMOTE_STORE_ENABLED, true)
             .build();
 
         CryptoIndexSettingsValidator.validate(settings);

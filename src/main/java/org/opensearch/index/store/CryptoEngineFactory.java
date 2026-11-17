@@ -16,7 +16,6 @@ import org.opensearch.index.engine.EngineConfig;
 import org.opensearch.index.engine.EngineFactory;
 import org.opensearch.index.engine.InternalEngine;
 import org.opensearch.index.engine.NRTReplicationEngine;
-import org.opensearch.index.remote.RemoteTranslogTransferTracker;
 import org.opensearch.index.store.key.KeyResolver;
 import org.opensearch.index.store.key.ShardKeyResolverRegistry;
 import org.opensearch.index.translog.CryptoTranslogFactory;
@@ -37,27 +36,16 @@ public class CryptoEngineFactory implements EngineFactory {
     public Engine newReadWriteEngine(EngineConfig config) {
 
         try {
+            if (config.getIndexSettings().isRemoteTranslogStoreEnabled()) {
+                throw new IllegalArgumentException(
+                    "index.store.type cryptofs does not support remote store on OpenSearch 2.19; "
+                        + "use a local translog or a non-cryptofs store"
+                );
+            }
+
             Provider provider = CryptoDirectoryFactory.resolveCryptoProvider(config.getIndexSettings().getSettings());
             KeyResolver keyResolver = createTranslogKeyResolver(config, provider);
-
-            // Check if remote translog is enabled
-            boolean isRemoteTranslogEnabled = config.getIndexSettings().isRemoteTranslogStoreEnabled();
-
-            CryptoTranslogFactory cryptoTranslogFactory;
-
-            if (isRemoteTranslogEnabled) {
-                cryptoTranslogFactory = new CryptoTranslogFactory(
-                    keyResolver,
-                    provider,
-                    CryptoDirectoryPlugin.getRepositoriesServiceSupplier(),
-                    config.getThreadPool(),
-                    config.getIndexSettings().getRemoteStoreTranslogRepository(),
-                    new RemoteTranslogTransferTracker(config.getShardId(), 100),
-                    CryptoDirectoryPlugin.getRemoteStoreSettings()
-                );
-            } else {
-                cryptoTranslogFactory = new CryptoTranslogFactory(keyResolver, provider);
-            }
+            CryptoTranslogFactory cryptoTranslogFactory = new CryptoTranslogFactory(keyResolver, provider);
 
             // OpenSearch 2.19 EngineConfig cannot be cloned in-place; copy via public getters
             // and replace only the translog factory with our crypto version.
