@@ -29,7 +29,10 @@ import org.junit.After;
 import org.junit.Before;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.opensearch.action.support.clustermanager.AcknowledgedResponse;
+import org.opensearch.action.support.master.AcknowledgedResponse;
+import org.opensearch.client.AdminClient;
+import org.opensearch.client.Client;
+import org.opensearch.client.IndicesAdminClient;
 import org.opensearch.cluster.ClusterState;
 import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.service.ClusterService;
@@ -39,9 +42,6 @@ import org.opensearch.common.settings.Settings;
 import org.opensearch.index.store.CaffeineThreadLeakFilter;
 import org.opensearch.index.store.CryptoDirectoryFactory;
 import org.opensearch.test.OpenSearchTestCase;
-import org.opensearch.transport.client.AdminClient;
-import org.opensearch.transport.client.Client;
-import org.opensearch.transport.client.IndicesAdminClient;
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
 

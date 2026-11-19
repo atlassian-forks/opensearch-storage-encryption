@@ -5,10 +5,16 @@
 package org.opensearch.index.translog;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.Set;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.opensearch.index.store.PrivilegedAccess;
 import org.opensearch.index.store.key.KeyResolver;
 import org.opensearch.index.translog.transfer.FileSnapshot.TransferFileSnapshot;
 import org.opensearch.index.translog.transfer.FileSnapshot.TranslogFileSnapshot;
@@ -90,22 +96,65 @@ public class DecryptingTransferSnapshot implements TransferSnapshot {
     }
 
     private Set<TransferFileSnapshot> wrapTranslogSnapshots(Set<TransferFileSnapshot> originals) throws IOException {
-        Set<TransferFileSnapshot> wrapped = new java.util.HashSet<>();
+        Set<TransferFileSnapshot> wrapped = new HashSet<>();
 
         for (TransferFileSnapshot snapshot : originals) {
             if (snapshot instanceof TranslogFileSnapshot) {
                 TranslogFileSnapshot translogSnapshot = (TranslogFileSnapshot) snapshot;
-                java.nio.file.Path path = translogSnapshot.getPath();
+                Path path = translogSnapshot.getPath();
 
                 // This writes authentication tags so the file can be decrypted during upload
                 cryptoFactory.finalizeForPath(path);
 
-                wrapped.add(new DecryptingFileSnapshot(translogSnapshot, keyResolver, translogUUID, cryptoFactory.getProvider()));
+                if (path != null && path.getFileName().toString().endsWith(".tlog")) {
+                    // 2.19 TranslogFileSnapshot is final, and TranslogTransferManager.prepareMetadata
+                    // checkcasts TransferFileSnapshot to TranslogFileSnapshot. Materialize decrypted
+                    // bytes as a real TranslogFileSnapshot with the original filename.
+                    wrapped.add(materializeDecryptedTranslogSnapshot(translogSnapshot));
+                } else {
+                    wrapped.add(snapshot);
+                }
             } else {
                 wrapped.add(snapshot);
             }
         }
 
         return wrapped;
+    }
+
+    /**
+     * Decrypt {@code translogSnapshot} into a temp file named like the original, then wrap that
+     * path in a 2.19 {@link TranslogFileSnapshot} so upload and metadata mapping still type-check.
+     */
+    private TranslogFileSnapshot materializeDecryptedTranslogSnapshot(TranslogFileSnapshot translogSnapshot) throws IOException {
+        DecryptingFileSnapshot decrypting = new DecryptingFileSnapshot(
+            translogSnapshot,
+            keyResolver,
+            translogUUID,
+            cryptoFactory.getProvider()
+        );
+        Path originalPath = translogSnapshot.getPath();
+        Path decryptedDir = PrivilegedAccess.doPrivilegedIOException(() -> Files.createTempDirectory("cryptofs-tlog-decrypt-"));
+        Path decryptedPath = decryptedDir.resolve(originalPath.getFileName());
+        try (
+            InputStream in = decrypting.inputStream();
+            OutputStream out = PrivilegedAccess.doPrivilegedIOException(() -> Files.newOutputStream(decryptedPath))
+        ) {
+            in.transferTo(out);
+        } finally {
+            decrypting.close();
+        }
+        decryptedPath.toFile().deleteOnExit();
+        decryptedDir.toFile().deleteOnExit();
+        TranslogFileSnapshot materialized = new TranslogFileSnapshot(
+            translogSnapshot.getPrimaryTerm(),
+            translogSnapshot.getGeneration(),
+            decryptedPath,
+            null
+        );
+        if (translogSnapshot.getMetadataFileInputStream() != null) {
+            materialized.setMetadataFileInputStream(translogSnapshot.getMetadataFileInputStream());
+        }
+        return materialized;
     }
 }

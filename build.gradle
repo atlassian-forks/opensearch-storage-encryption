@@ -11,7 +11,7 @@
 
 buildscript {
     ext {
-        opensearch_version = System.getProperty("opensearch.version", "3.6.0-SNAPSHOT")
+        opensearch_version = System.getProperty("opensearch.version", "2.19.6")
     }
 
     repositories {
@@ -38,7 +38,6 @@ plugins {
 apply plugin: 'opensearch.opensearchplugin'
 apply plugin: 'opensearch.yaml-rest-test'
 apply plugin: 'opensearch.internal-cluster-test'
-apply plugin: 'opensearch.java-agent'
 
 ext {
     projectSubstitutions = [:]
@@ -78,12 +77,6 @@ dependencies {
     internalClusterTestImplementation "org.opensearch.plugin:crypto-kms:${opensearch_version}"
 
     implementation 'com.github.ben-manes.caffeine:caffeine:3.0.0'
-    api "io.netty:netty-buffer:4.2.5.Final"
-    api "io.netty:netty-transport:4.2.5.Final"
-    api "io.netty:netty-transport-native-unix-common:4.2.5.Final"
-    api "io.netty:netty-transport-classes-io_uring:4.2.5.Final"
-    api "io.netty:netty-common:4.2.5.Final"
-    api "io.netty:netty-transport-native-io_uring:4.2.5.Final"
 }
 
 configurations.all {
@@ -101,7 +94,8 @@ test {
     systemProperty 'tests.security.manager', 'false'
     systemProperty 'tests.jvm.argline', '--enable-native-access=ALL-UNNAMED'
     jvmArgs += [
-        '--enable-native-access=ALL-UNNAMED'
+        '--enable-native-access=ALL-UNNAMED',
+        '--enable-preview'
     ]
 }
 
@@ -113,37 +107,45 @@ tasks.named('internalClusterTest').configure {
         showStandardStreams = true
     }
     jvmArgs += [
-        '--enable-native-access=ALL-UNNAMED'
+        '--enable-native-access=ALL-UNNAMED',
+        '--enable-preview'
     ]
 }
 
 tasks.named('yamlRestTest').configure {
+    systemProperty 'tests.security.manager', 'false'
+    jvmArgs += [
+        '--enable-native-access=ALL-UNNAMED',
+        '--enable-preview'
+    ]
 }
 
 testClusters.yamlRestTest {
     setting 'plugins.crypto.enabled', 'true'
     setting 'node.store.crypto.pool_size_percentage', '0.0'
     setting 'node.store.crypto.warmup_percentage', '0.0'
+    jvmArgs '--enable-preview', '--enable-native-access=ALL-UNNAMED'
 }
 
 compileJava {
-    sourceCompatibility = JavaVersion.VERSION_25
-    targetCompatibility = JavaVersion.VERSION_25
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
     options.encoding = 'UTF-8'
     options.compilerArgs << '-Xlint:unchecked' << '-Xlint:-deprecation'
 }
 
 compileTestJava {
-    sourceCompatibility = JavaVersion.VERSION_25
-    targetCompatibility = JavaVersion.VERSION_25
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 tasks.withType(JavaCompile).configureEach {
-    sourceCompatibility = JavaVersion.VERSION_25
-    targetCompatibility = JavaVersion.VERSION_25
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
     options.encoding = 'UTF-8'
-    options.release = 25
+    options.release = 21
     options.compilerArgs << '-Xlint:-deprecation'
+    options.compilerArgs << '--enable-preview'
 }
 
 tasks.withType(Javadoc).configureEach {
@@ -151,7 +153,7 @@ tasks.withType(Javadoc).configureEach {
     options.charSet = 'UTF-8'
     options.addStringOption('Xdoclint:all', '-quiet')
     options.addStringOption('tag', 'opensearch.internal:a:Internal:')
-    options.addStringOption('source', '25')
+    options.addStringOption('source', '21')
     failOnError = false
 }
 
@@ -199,8 +201,8 @@ jcstress {
 // to generate META-INF/TestList, and JMH needs it for benchmark generation.
 afterEvaluate {
     tasks.named('compileJcstressJava').configure {
-        sourceCompatibility = JavaVersion.VERSION_25
-        targetCompatibility = JavaVersion.VERSION_25
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
         options.compilerArgs.removeAll { it == '-proc:none' }
     }
     tasks.named('compileTestJava').configure {

@@ -10,13 +10,13 @@ import static org.opensearch.rest.RestRequest.Method.GET;
 import java.io.IOException;
 import java.util.List;
 
+import org.opensearch.client.node.NodeClient;
 import org.opensearch.index.store.Constants;
 import org.opensearch.index.store.action.GetIndexCountForKeyAction;
 import org.opensearch.index.store.action.GetIndexCountForKeyRequest;
 import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.rest.action.RestToXContentListener;
-import org.opensearch.transport.client.node.NodeClient;
 
 public class RestGetIndexCountForKeyAction extends BaseRestHandler {
 

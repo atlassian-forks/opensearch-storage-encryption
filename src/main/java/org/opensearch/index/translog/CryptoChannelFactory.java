@@ -15,6 +15,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.opensearch.common.util.io.IOUtils;
+import org.opensearch.index.store.PrivilegedAccess;
 import org.opensearch.index.store.key.KeyResolver;
 
 /**
@@ -58,7 +59,7 @@ public class CryptoChannelFactory implements ChannelFactory {
 
     @Override
     public FileChannel open(Path path, OpenOption... options) throws IOException {
-        FileChannel baseChannel = FileChannel.open(path, options);
+        FileChannel baseChannel = PrivilegedAccess.doPrivilegedIOException(() -> FileChannel.open(path, options));
 
         if (!path.getFileName().toString().endsWith(".tlog")) {
             return baseChannel;

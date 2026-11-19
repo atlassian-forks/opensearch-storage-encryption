@@ -13,6 +13,7 @@ import org.apache.logging.log4j.Logger;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.index.store.CryptoDirectoryFactory;
+import org.opensearch.index.store.PrivilegedAccess;
 
 import com.github.benmanes.caffeine.cache.CacheLoader;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -92,25 +93,27 @@ public class NodeLevelKeyCache {
         this.keyExpiryDuration = keyExpiryDuration;
         this.healthMonitor = Objects.requireNonNull(healthMonitor, "healthMonitor cannot be null");
 
-        // Suppress Caffeine's internal logging to reduce log spam during key reload failures
-        // This prevents duplicate exception logging from Caffeine's BoundedLocalCache
-        java.util.logging.Logger.getLogger("com.github.benmanes.caffeine.cache").setLevel(java.util.logging.Level.SEVERE);
+        this.keyCache = PrivilegedAccess.doPrivileged(() -> {
+            // Suppress Caffeine's internal logging to reduce log spam during key reload failures
+            // This prevents duplicate exception logging from Caffeine's BoundedLocalCache
+            java.util.logging.Logger.getLogger("com.github.benmanes.caffeine.cache").setLevel(java.util.logging.Level.SEVERE);
 
-        // Create cache with expiration only
-        // Refresh is handled manually by MasterKeyHealthMonitor to avoid reload storms
-        Caffeine<Object, Object> builder = Caffeine.newBuilder();
+            // Create cache with expiration only
+            // Refresh is handled manually by MasterKeyHealthMonitor to avoid reload storms
+            Caffeine<Object, Object> builder = Caffeine.newBuilder();
 
-        // Only set expireAfterWrite if keyExpiryDuration is positive
-        if (keyExpiryDuration > 0) {
-            builder.expireAfterWrite(keyExpiryDuration, java.util.concurrent.TimeUnit.SECONDS);
-        }
-        // If keyExpiryDuration <= 0, cache never expires
-
-        this.keyCache = builder.build(new CacheLoader<ShardCacheKey, Key>() {
-            @Override
-            public Key load(ShardCacheKey key) throws Exception {
-                return loadKey(key);
+            // Only set expireAfterWrite if keyExpiryDuration is positive
+            if (keyExpiryDuration > 0) {
+                builder.expireAfterWrite(keyExpiryDuration, java.util.concurrent.TimeUnit.SECONDS);
             }
+            // If keyExpiryDuration <= 0, cache never expires
+
+            return builder.build(new CacheLoader<ShardCacheKey, Key>() {
+                @Override
+                public Key load(ShardCacheKey key) throws Exception {
+                    return loadKey(key);
+                }
+            });
         });
     }
 

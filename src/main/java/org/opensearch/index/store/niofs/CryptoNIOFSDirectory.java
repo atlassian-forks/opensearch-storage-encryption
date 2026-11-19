@@ -19,6 +19,7 @@ import org.apache.lucene.store.IndexOutput;
 import org.apache.lucene.store.LockFactory;
 import org.apache.lucene.store.NIOFSDirectory;
 import org.opensearch.common.util.io.IOUtils;
+import org.opensearch.index.store.PrivilegedAccess;
 import org.opensearch.index.store.cipher.EncryptionMetadataCache;
 import org.opensearch.index.store.footer.EncryptionFooter;
 import org.opensearch.index.store.footer.EncryptionMetadataTrailer;
@@ -77,7 +78,7 @@ public class CryptoNIOFSDirectory extends NIOFSDirectory {
             ensureOpen();
             ensureCanRead(name);
             Path path = getDirectory().resolve(name);
-            FileChannel fc = FileChannel.open(path, StandardOpenOption.READ);
+            FileChannel fc = PrivilegedAccess.doPrivilegedIOException(() -> FileChannel.open(path, StandardOpenOption.READ));
             boolean success = false;
 
             try {
@@ -176,7 +177,7 @@ public class CryptoNIOFSDirectory extends NIOFSDirectory {
         }
 
         // read footer from disk with OSEF validation
-        try (FileChannel channel = FileChannel.open(path, StandardOpenOption.READ)) {
+        try (FileChannel channel = PrivilegedAccess.doPrivilegedIOException(() -> FileChannel.open(path, StandardOpenOption.READ))) {
             try {
                 EncryptionFooter footer = EncryptionFooter
                     .readViaFileChannel(normalizedPath, channel, keyResolver.getDataKey().getEncoded(), encryptionMetadataCache, provider);

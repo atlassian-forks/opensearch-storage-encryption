@@ -106,7 +106,7 @@ public class SnapshotRestoreIntegTests extends OpenSearchIntegTestCase {
 
         // Verify source data
         SearchResponse sourceResponse = client().prepareSearch("source-encrypted-index").setSize(0).get();
-        assertThat("Source index should have all documents", sourceResponse.getHits().getTotalHits().value(), equalTo((long) numDocs));
+        assertThat("Source index should have all documents", sourceResponse.getHits().getTotalHits().value, equalTo((long) numDocs));
 
         // Create snapshot
         logger.info("Creating snapshot of encrypted index");
@@ -141,14 +141,14 @@ public class SnapshotRestoreIntegTests extends OpenSearchIntegTestCase {
 
         // Verify restored data
         SearchResponse restoredResponse = client().prepareSearch("restored-encrypted-index").setSize(0).get();
-        assertThat("Restored index should have all documents", restoredResponse.getHits().getTotalHits().value(), equalTo((long) numDocs));
+        assertThat("Restored index should have all documents", restoredResponse.getHits().getTotalHits().value, equalTo((long) numDocs));
 
         // Verify specific document content
         SearchResponse specificDoc = client()
             .prepareSearch("restored-encrypted-index")
             .setQuery(org.opensearch.index.query.QueryBuilders.termQuery("number", 0))
             .get();
-        assertThat("Should find specific document", specificDoc.getHits().getTotalHits().value(), equalTo(1L));
+        assertThat("Should find specific document", specificDoc.getHits().getTotalHits().value, equalTo(1L));
 
         logger.info("Snapshot/restore test completed successfully");
     }
@@ -228,7 +228,7 @@ public class SnapshotRestoreIntegTests extends OpenSearchIntegTestCase {
 
             // Verify restored data contains all documents up to this cycle
             SearchResponse restoredResponse = client().prepareSearch(restoredIndexName).setSize(0).get();
-            assertThat(restoredResponse.getHits().getTotalHits().value(), equalTo((long) endDoc));
+            assertThat(restoredResponse.getHits().getTotalHits().value, equalTo((long) endDoc));
 
             logger.info("Cycle {} completed successfully", cycle);
         }
@@ -303,7 +303,7 @@ public class SnapshotRestoreIntegTests extends OpenSearchIntegTestCase {
 
         // Verify data after node restart
         SearchResponse response = client().prepareSearch("persistent-index").setSize(0).get();
-        assertThat(response.getHits().getTotalHits().value(), equalTo((long) numDocs));
+        assertThat(response.getHits().getTotalHits().value, equalTo((long) numDocs));
 
         logger.info("Restore after node restart test completed successfully");
     }
@@ -353,7 +353,7 @@ public class SnapshotRestoreIntegTests extends OpenSearchIntegTestCase {
 
         // Verify data with first key
         SearchResponse response1 = client().prepareSearch("key-rotation-index").setSize(0).get();
-        assertThat(response1.getHits().getTotalHits().value(), equalTo((long) numDocs));
+        assertThat(response1.getHits().getTotalHits().value, equalTo((long) numDocs));
 
         // Create snapshot
         logger.info("Creating snapshot with key-arn-1");
@@ -390,7 +390,7 @@ public class SnapshotRestoreIntegTests extends OpenSearchIntegTestCase {
 
         // Verify all old data is still accessible (encrypted with key1 in snapshot)
         SearchResponse response2 = client().prepareSearch("key-rotation-index").setSize(0).get();
-        assertThat("All original documents should be accessible", response2.getHits().getTotalHits().value(), equalTo((long) numDocs));
+        assertThat("All original documents should be accessible", response2.getHits().getTotalHits().value, equalTo((long) numDocs));
 
         // Add new documents (will be encrypted with key2)
         int newDocs = 30;
@@ -401,7 +401,7 @@ public class SnapshotRestoreIntegTests extends OpenSearchIntegTestCase {
 
         // Verify total document count
         SearchResponse response3 = client().prepareSearch("key-rotation-index").setSize(0).get();
-        assertThat(response3.getHits().getTotalHits().value(), equalTo((long) (numDocs + newDocs)));
+        assertThat(response3.getHits().getTotalHits().value, equalTo((long) (numDocs + newDocs)));
 
         // Verify we can query both old and new data
         SearchResponse oldData = client()
@@ -409,14 +409,14 @@ public class SnapshotRestoreIntegTests extends OpenSearchIntegTestCase {
             .setQuery(org.opensearch.index.query.QueryBuilders.termQuery("phase", "key1"))
             .setSize(0)
             .get();
-        assertThat("Old data encrypted with key1", oldData.getHits().getTotalHits().value(), equalTo((long) numDocs));
+        assertThat("Old data encrypted with key1", oldData.getHits().getTotalHits().value, equalTo((long) numDocs));
 
         SearchResponse newData = client()
             .prepareSearch("key-rotation-index")
             .setQuery(org.opensearch.index.query.QueryBuilders.termQuery("phase", "key2"))
             .setSize(0)
             .get();
-        assertThat("New data encrypted with key2", newData.getHits().getTotalHits().value(), equalTo((long) newDocs));
+        assertThat("New data encrypted with key2", newData.getHits().getTotalHits().value, equalTo((long) newDocs));
 
         logger.info("Restore with different key test completed successfully");
     }
@@ -470,9 +470,9 @@ public class SnapshotRestoreIntegTests extends OpenSearchIntegTestCase {
         refresh();
 
         // Verify initial data
-        assertThat(client().prepareSearch("index-1").setSize(0).get().getHits().getTotalHits().value(), equalTo((long) docs1));
-        assertThat(client().prepareSearch("index-2").setSize(0).get().getHits().getTotalHits().value(), equalTo((long) docs2));
-        assertThat(client().prepareSearch("index-3").setSize(0).get().getHits().getTotalHits().value(), equalTo((long) docs3));
+        assertThat(client().prepareSearch("index-1").setSize(0).get().getHits().getTotalHits().value, equalTo((long) docs1));
+        assertThat(client().prepareSearch("index-2").setSize(0).get().getHits().getTotalHits().value, equalTo((long) docs2));
+        assertThat(client().prepareSearch("index-3").setSize(0).get().getHits().getTotalHits().value, equalTo((long) docs3));
 
         // Create snapshot of all indices
         logger.info("Creating snapshot of all encrypted indices");
@@ -508,12 +508,12 @@ public class SnapshotRestoreIntegTests extends OpenSearchIntegTestCase {
         // Verify restored indices have correct data
         assertThat(
             "index-1 should have all documents",
-            client().prepareSearch("index-1").setSize(0).get().getHits().getTotalHits().value(),
+            client().prepareSearch("index-1").setSize(0).get().getHits().getTotalHits().value,
             equalTo((long) docs1)
         );
         assertThat(
             "index-3 should have all documents",
-            client().prepareSearch("index-3").setSize(0).get().getHits().getTotalHits().value(),
+            client().prepareSearch("index-3").setSize(0).get().getHits().getTotalHits().value,
             equalTo((long) docs3)
         );
 
@@ -623,11 +623,7 @@ public class SnapshotRestoreIntegTests extends OpenSearchIntegTestCase {
         // Verify all data was restored correctly
         for (int i = 0; i < numIndices; i++) {
             SearchResponse response = client().prepareSearch("concurrent-index-" + i).setSize(0).get();
-            assertThat(
-                "Index " + i + " should have all documents",
-                response.getHits().getTotalHits().value(),
-                equalTo((long) docsPerIndex)
-            );
+            assertThat("Index " + i + " should have all documents", response.getHits().getTotalHits().value, equalTo((long) docsPerIndex));
         }
 
         logger.info("Concurrent snapshots test completed successfully");

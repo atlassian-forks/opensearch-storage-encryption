@@ -6,6 +6,7 @@ package org.opensearch.index.store;
 
 import java.util.regex.Pattern;
 
+import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.settings.SettingsException;
 import org.opensearch.index.IndexModule;
@@ -48,6 +49,20 @@ public class CryptoIndexSettingsValidator {
         validateCryptoProvider(indexSettings);
         validateKmsSettings(indexSettings);
         validateKmsEncryptionContext(indexSettings);
+        validateRemoteStoreNotEnabled(indexSettings);
+    }
+
+    /**
+     * Remote-backed translogs need decrypt-on-upload and a ChannelFactory that 2.19
+     * LocalTranslog cannot take as a constructor argument. Keep this line local-only.
+     */
+    private static void validateRemoteStoreNotEnabled(Settings indexSettings) {
+        if (indexSettings.getAsBoolean(IndexMetadata.SETTING_REMOTE_STORE_ENABLED, false)) {
+            throw new IllegalArgumentException(
+                "index.store.type cryptofs does not support remote store on OpenSearch 2.19; "
+                    + "use a local translog or a non-cryptofs store"
+            );
+        }
     }
 
     /**

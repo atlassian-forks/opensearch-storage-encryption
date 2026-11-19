@@ -12,6 +12,19 @@ Security features include support for both AES-CTR and AES-GCM encryption algori
 
 Built-in monitoring and comprehensive metrics provide visibility into plugin operations and performance characteristics.
 
+## Runtime requirements (OpenSearch 2.19 / JDK 21)
+
+This `release/2.19` line compiles Panama FFM as a **JDK 21 preview API**. Preview class files only load on the same Java feature release, and only when the node JVM is started with:
+
+```
+--enable-preview
+--enable-native-access=ALL-UNNAMED
+```
+
+Add both flags to `config/jvm.options` (or `OPENSEARCH_JAVA_OPTS`) on every node that loads this plugin. Without `--enable-preview` the plugin fails to load. Without `--enable-native-access=ALL-UNNAMED` native OpenSSL and Direct I/O downcalls are blocked.
+
+On JDK 22 and later the FFM API is final, so `--enable-preview` and the JDK 21-specific call forms are not needed on the 3.x/main branch.
+
 ## Architecture
 
 ```
@@ -91,8 +104,8 @@ I/O performance is enhanced through several optimization mechanisms. `ReadaheadM
 
 ## Requirements
 
-- **JDK**: 25
-- **OpenSearch**: 3.6.0-SNAPSHOT or compatible version
+- **JDK**: 21
+- **OpenSearch**: 2.19.6 or 2.19.6-compatible
 - **Master Key Provider**: Required for key management
 - **Operating System**: Linux recommended for Direct I/O features (io_uring)
 

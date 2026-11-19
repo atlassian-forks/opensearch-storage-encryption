@@ -25,6 +25,7 @@ import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.store.IndexOutput;
 import org.apache.lucene.store.LockFactory;
 import org.opensearch.common.SuppressForbidden;
+import org.opensearch.index.store.PrivilegedAccess;
 import org.opensearch.index.store.block.RefCountedMemorySegment;
 import org.opensearch.index.store.block_cache.BlockCache;
 import org.opensearch.index.store.block_cache.CaffeineBlockCache;
@@ -280,7 +281,7 @@ public class BufferPoolDirectory extends FSDirectory {
         }
 
         // Cache miss - read footer from disk (happens during file open before cache populated)
-        try (FileChannel channel = FileChannel.open(file, StandardOpenOption.READ)) {
+        try (FileChannel channel = PrivilegedAccess.doPrivilegedIOException(() -> FileChannel.open(file, StandardOpenOption.READ))) {
             EncryptionFooter footer = EncryptionFooter
                 .readViaFileChannel(normalizedPath, channel, masterKeyBytes, encryptionMetadataCache, provider);
 

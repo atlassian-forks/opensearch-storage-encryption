@@ -14,6 +14,7 @@ import java.nio.file.StandardOpenOption;
 import java.security.Provider;
 import java.util.Set;
 
+import org.opensearch.index.store.PrivilegedAccess;
 import org.opensearch.index.store.key.KeyResolver;
 
 /**
@@ -43,7 +44,7 @@ public class CryptoDecryptingInputStream extends InputStream {
      */
     public CryptoDecryptingInputStream(Path filePath, KeyResolver keyResolver, String translogUUID, Provider provider) throws IOException {
         Set<OpenOption> openOptions = Set.of(StandardOpenOption.READ);
-        this.encryptedChannel = FileChannel.open(filePath, StandardOpenOption.READ);
+        this.encryptedChannel = PrivilegedAccess.doPrivilegedIOException(() -> FileChannel.open(filePath, StandardOpenOption.READ));
 
         // Wrap with crypto channel for decrypted stream
         this.decryptingChannel = new CryptoFileChannelWrapper(encryptedChannel, keyResolver, filePath, openOptions, translogUUID, provider);

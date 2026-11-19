@@ -102,7 +102,7 @@ public class IndexTemplateIntegTests extends OpenSearchIntegTestCase {
         refresh("logs-2024-01");
 
         SearchResponse response = client().prepareSearch("logs-2024-01").setSize(0).get();
-        assertThat(response.getHits().getTotalHits().value(), equalTo((long) numDocs));
+        assertThat(response.getHits().getTotalHits().value, equalTo((long) numDocs));
 
         logger.info("Legacy template test completed - {} docs indexed and retrieved", numDocs);
     }
@@ -143,7 +143,7 @@ public class IndexTemplateIntegTests extends OpenSearchIntegTestCase {
 
         for (String index : indices) {
             SearchResponse response = client().prepareSearch(index).get();
-            assertThat(response.getHits().getTotalHits().value(), greaterThan(0L));
+            assertThat(response.getHits().getTotalHits().value, greaterThan(0L));
         }
 
         logger.info("Multiple pattern template test completed");
@@ -274,7 +274,7 @@ public class IndexTemplateIntegTests extends OpenSearchIntegTestCase {
         client().prepareIndex("test-priority-index").setSource("field", "value").get();
         refresh("test-priority-index");
         SearchResponse response = client().prepareSearch("test-priority-index").get();
-        assertThat(response.getHits().getTotalHits().value(), equalTo(1L));
+        assertThat(response.getHits().getTotalHits().value, equalTo(1L));
 
         logger.info("Template priority test completed - high priority template applied");
     }
@@ -327,7 +327,7 @@ public class IndexTemplateIntegTests extends OpenSearchIntegTestCase {
         refresh("composable-index-001");
 
         SearchResponse response = client().prepareSearch("composable-index-001").setSize(0).get();
-        assertThat(response.getHits().getTotalHits().value(), equalTo((long) numDocs));
+        assertThat(response.getHits().getTotalHits().value, equalTo((long) numDocs));
 
         logger.info("Composable template test completed");
     }
@@ -378,7 +378,7 @@ public class IndexTemplateIntegTests extends OpenSearchIntegTestCase {
         client().prepareIndex("component-test-index").setSource("test", "data").get();
         refresh("component-test-index");
         SearchResponse response = client().prepareSearch("component-test-index").get();
-        assertThat(response.getHits().getTotalHits().value(), equalTo(1L));
+        assertThat(response.getHits().getTotalHits().value, equalTo(1L));
 
         logger.info("Layered settings template test completed");
     }
@@ -447,15 +447,15 @@ public class IndexTemplateIntegTests extends OpenSearchIntegTestCase {
         SearchResponse oldIndexResponse = client().prepareSearch("rollover-000001").setSize(0).get();
         SearchResponse newIndexResponse = client().prepareSearch("rollover-000002").setSize(0).get();
 
-        assertThat("Old index should have docs", oldIndexResponse.getHits().getTotalHits().value(), greaterThan(0L));
-        assertThat("New index should have docs", newIndexResponse.getHits().getTotalHits().value(), greaterThan(0L));
+        assertThat("Old index should have docs", oldIndexResponse.getHits().getTotalHits().value, greaterThan(0L));
+        assertThat("New index should have docs", newIndexResponse.getHits().getTotalHits().value, greaterThan(0L));
 
         // Search across alias
         SearchResponse aliasResponse = client().prepareSearch("rollover-alias").setSize(0).get();
         assertThat(
             "Alias should search both indices",
-            aliasResponse.getHits().getTotalHits().value(),
-            equalTo(oldIndexResponse.getHits().getTotalHits().value() + newIndexResponse.getHits().getTotalHits().value())
+            aliasResponse.getHits().getTotalHits().value,
+            equalTo(oldIndexResponse.getHits().getTotalHits().value + newIndexResponse.getHits().getTotalHits().value)
         );
 
         logger.info("Rollover test completed - old: {}, new: {}", "rollover-000001", "rollover-000002");
@@ -525,7 +525,7 @@ public class IndexTemplateIntegTests extends OpenSearchIntegTestCase {
             // Only verify docs for indices that have data (first 4 indices)
             if (i < 4) {
                 SearchResponse searchResponse = client().prepareSearch(index).setSize(0).get();
-                assertThat("Index " + index + " should have docs", searchResponse.getHits().getTotalHits().value(), greaterThan(0L));
+                assertThat("Index " + index + " should have docs", searchResponse.getHits().getTotalHits().value, greaterThan(0L));
             }
         }
 
@@ -593,8 +593,8 @@ public class IndexTemplateIntegTests extends OpenSearchIntegTestCase {
         // Verify both indices work
         SearchResponse oldResponse = client().prepareSearch("age-test-000001").setSize(0).get();
         SearchResponse newResponse = client().prepareSearch("age-test-000002").setSize(0).get();
-        assertThat(oldResponse.getHits().getTotalHits().value(), equalTo(10L));
-        assertThat(newResponse.getHits().getTotalHits().value(), equalTo(5L));
+        assertThat(oldResponse.getHits().getTotalHits().value, equalTo(10L));
+        assertThat(newResponse.getHits().getTotalHits().value, equalTo(5L));
 
         logger.info("Age-based rollover test completed");
     }
@@ -672,7 +672,7 @@ public class IndexTemplateIntegTests extends OpenSearchIntegTestCase {
 
         // Verify all data is searchable across all rolled-over indices
         SearchResponse totalResponse = client().prepareSearch("logs-ingestion-*").setSize(0).get();
-        assertThat("All ingested docs should be searchable", totalResponse.getHits().getTotalHits().value(), equalTo((long) totalDocs));
+        assertThat("All ingested docs should be searchable", totalResponse.getHits().getTotalHits().value, equalTo((long) totalDocs));
 
         logger.info("Continuous ingestion rollover test completed - {} total docs across 4 indices", totalDocs);
     }
@@ -797,8 +797,8 @@ public class IndexTemplateIntegTests extends OpenSearchIntegTestCase {
 
         SearchResponse response1 = client().prepareSearch("update-test-001").get();
         SearchResponse response2 = client().prepareSearch("update-test-002").get();
-        assertThat(response1.getHits().getTotalHits().value(), greaterThan(0L));
-        assertThat(response2.getHits().getTotalHits().value(), greaterThan(0L));
+        assertThat(response1.getHits().getTotalHits().value, greaterThan(0L));
+        assertThat(response2.getHits().getTotalHits().value, greaterThan(0L));
 
         logger.info("Template update test completed");
     }
@@ -843,7 +843,7 @@ public class IndexTemplateIntegTests extends OpenSearchIntegTestCase {
         client().prepareIndex("delete-test-001").setSource("test", "value").get();
         refresh("delete-test-001");
         SearchResponse response1 = client().prepareSearch("delete-test-001").get();
-        assertThat(response1.getHits().getTotalHits().value(), greaterThan(0L));
+        assertThat(response1.getHits().getTotalHits().value, greaterThan(0L));
 
         logger.info("Template deletion test completed");
     }
@@ -880,10 +880,10 @@ public class IndexTemplateIntegTests extends OpenSearchIntegTestCase {
 
         // Test reading through alias
         SearchResponse readResponse = client().prepareSearch("read-alias").get();
-        assertThat(readResponse.getHits().getTotalHits().value(), equalTo(1L));
+        assertThat(readResponse.getHits().getTotalHits().value, equalTo(1L));
 
         SearchResponse writeResponse = client().prepareSearch("write-alias").get();
-        assertThat(writeResponse.getHits().getTotalHits().value(), equalTo(1L));
+        assertThat(writeResponse.getHits().getTotalHits().value, equalTo(1L));
 
         logger.info("Template with aliases test completed");
     }
@@ -925,7 +925,7 @@ public class IndexTemplateIntegTests extends OpenSearchIntegTestCase {
 
         // Verify all are searchable
         SearchResponse response = client().prepareSearch("logs-*").setSize(0).get();
-        assertThat(response.getHits().getTotalHits().value(), equalTo((long) dateIndices.length));
+        assertThat(response.getHits().getTotalHits().value, equalTo((long) dateIndices.length));
 
         logger.info("Date math pattern test completed - {} indices", dateIndices.length);
     }
@@ -992,8 +992,8 @@ public class IndexTemplateIntegTests extends OpenSearchIntegTestCase {
         SearchResponse singleResponse = client().prepareSearch("single-test-index").setSize(0).get();
         SearchResponse multiResponse = client().prepareSearch("multi-test-index").setSize(0).get();
 
-        assertThat(singleResponse.getHits().getTotalHits().value(), equalTo(100L));
-        assertThat(multiResponse.getHits().getTotalHits().value(), equalTo(100L));
+        assertThat(singleResponse.getHits().getTotalHits().value, equalTo(100L));
+        assertThat(multiResponse.getHits().getTotalHits().value, equalTo(100L));
 
         logger.info("Shard configuration test completed");
     }
@@ -1079,7 +1079,7 @@ public class IndexTemplateIntegTests extends OpenSearchIntegTestCase {
         refresh("enabled-test-index");
 
         SearchResponse response = client().prepareSearch("enabled-test-index").setSize(0).get();
-        assertThat("All documents should be retrievable", response.getHits().getTotalHits().value(), equalTo((long) numDocs));
+        assertThat("All documents should be retrievable", response.getHits().getTotalHits().value, equalTo((long) numDocs));
 
         logger.info("Enabled plugin test completed - {} docs indexed and retrieved", numDocs);
     }

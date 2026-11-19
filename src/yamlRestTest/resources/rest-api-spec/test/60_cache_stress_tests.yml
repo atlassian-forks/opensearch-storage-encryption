@@ -1,8 +1,5 @@
 ---
 "Test large single document spanning multiple cache blocks":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -56,9 +53,6 @@
 
 ---
 "Test multiple large documents to trigger cache eviction":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -126,9 +120,6 @@
 
 ---
 "Test sequential bulk operations with medium-sized documents":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -206,9 +197,6 @@
 
 ---
 "Test random access pattern with varying document sizes":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -289,9 +277,6 @@
 
 ---
 "Test large document search and aggregations":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -366,9 +351,6 @@
 
 ---
 "Test update operations on large documents":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:

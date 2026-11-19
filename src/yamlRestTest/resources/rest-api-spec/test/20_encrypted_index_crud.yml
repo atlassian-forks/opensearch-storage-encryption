@@ -1,8 +1,5 @@
 ---
 "Create encrypted index and perform CRUD operations":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -140,9 +137,6 @@
 
 ---
 "Test encrypted index with complex document structure":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -217,9 +211,6 @@
 
 ---
 "Test encrypted index data persistence":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:

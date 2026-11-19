@@ -2,4 +2,32 @@
 grant {
     // kms client opens socket connections for to kms
     permission java.net.SocketPermission "*", "connect,resolve";
+
+    // Caffeine 3.x (BlockCacheBuilder, NodeLevelKeyCache, FileChannelCache) uses
+    // MethodHandles.privateLookupIn / VarHandles. EngineConfigCopy.setAccessible
+    // copies the private EngineConfig.codecService field on OpenSearch 2.19.
+    permission java.lang.reflect.ReflectPermission "suppressAccessChecks";
+    permission java.lang.RuntimePermission "accessDeclaredMembers";
+    permission java.lang.RuntimePermission "accessClassInPackage.jdk.internal.misc";
+    permission java.lang.RuntimePermission "accessClassInPackage.sun.misc";
+
+    // NodeLevelKeyCache suppresses Caffeine JUL
+    permission java.util.logging.LoggingPermission "control";
+
+    // FileChannel cache, translog decrypt temp files, Direct I/O, and
+    // SymbolLookup.libraryLookup of libcrypto (Homebrew /lib64 paths).
+    // OpenSearch plugin policy only substitutes codebase.* properties, not
+    // path.data, so shard directories cannot be named here. execute is not
+    // granted: the plugin never starts a process.
+    permission java.io.FilePermission "<<ALL FILES>>", "read,write,delete";
+
+    // Panama FFM / libcrypto (OpenSslNativeCipher, PanamaNativeAccess)
+    permission java.lang.RuntimePermission "loadLibrary.*";
+    permission java.lang.RuntimePermission "accessClassInPackage.jdk.internal.foreign";
+    permission java.lang.RuntimePermission "accessClassInPackage.jdk.internal.foreign.*";
+    permission java.lang.RuntimePermission "accessClassInPackage.jdk.internal.foreign.abi";
+    permission java.lang.RuntimePermission "accessClassInPackage.jdk.internal.foreign.abi.*";
+    permission java.lang.RuntimePermission "accessClassInPackage.jdk.internal.loader";
+    permission java.lang.RuntimePermission "accessClassInPackage.sun.nio.ch";
+    permission java.lang.RuntimePermission "accessClassInPackage.jdk.internal.vm.annotation";
 };

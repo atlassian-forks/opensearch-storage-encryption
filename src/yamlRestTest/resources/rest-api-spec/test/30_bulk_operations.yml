@@ -1,8 +1,5 @@
 ---
 "Test bulk indexing with encrypted storage":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -132,9 +129,6 @@
 
 ---
 "Test bulk operations with mixed actions":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -219,9 +213,6 @@
 
 ---
 "Test large bulk operation performance":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:

@@ -1,8 +1,5 @@
 ---
 "Test refresh parameter on index operations":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -75,9 +72,6 @@
 
 ---
 "Test flush operation and Lucene commit points":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -182,9 +176,6 @@
 
 ---
 "Test synced flush deprecation handling":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -229,9 +220,6 @@
 
 ---
 "Test translog not stuck after multiple flush cycles":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -352,9 +340,6 @@
 
 ---
 "Test Lucene commit points advance properly":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -475,9 +460,6 @@
 
 ---
 "Test refresh and flush interaction with search":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index with disabled auto-refresh
   - do:
@@ -575,9 +557,6 @@
 
 ---
 "Test translog durability with flush and refresh":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index with request durability
   - do:
@@ -668,9 +647,6 @@
 
 ---
 "Test no stuck translogs after recovery":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:

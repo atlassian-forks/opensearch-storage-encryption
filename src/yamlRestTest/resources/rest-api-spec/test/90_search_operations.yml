@@ -1,8 +1,5 @@
 ---
 "Test encrypted index term query":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   - do:
       indices.create:
@@ -76,9 +73,6 @@
 
 ---
 "Test encrypted index match query":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -166,9 +160,6 @@
 
 ---
 "Test encrypted index bool query":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -302,9 +293,6 @@
 
 ---
 "Test encrypted index range query":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -422,9 +410,6 @@
 
 ---
 "Test encrypted index pagination with from and size":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -589,9 +574,6 @@
 
 ---
 "Test encrypted index track_total_hits parameter":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -687,9 +669,6 @@
 
 ---
 "Test encrypted index keyword field sorting":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -773,9 +752,6 @@
 
 ---
 "Test encrypted index numeric field sorting":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -880,9 +856,6 @@
 
 ---
 "Test encrypted index date field sorting":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -985,9 +958,6 @@
 
 ---
 "Test encrypted index complex search with pagination and sorting":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -1130,9 +1100,6 @@
 
 ---
 "Test encrypted index scroll API for large result sets":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -1303,9 +1270,6 @@
 
 ---
 "Test encrypted index Point in Time (PIT) API":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -1459,9 +1423,6 @@
 
 ---
 "Test encrypted index scroll with concurrent writes":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -1593,9 +1554,6 @@
 
 ---
 "Test encrypted index PIT with concurrent writes":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -1758,9 +1716,6 @@
 
 ---
 "Test encrypted index scroll with keep_alive extension":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:

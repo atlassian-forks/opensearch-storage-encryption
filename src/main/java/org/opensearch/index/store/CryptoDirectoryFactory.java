@@ -336,7 +336,7 @@ public class CryptoDirectoryFactory implements IndexStorePlugin.DirectoryFactory
         try {
             final Path location = path.resolveIndex();
             final LockFactory lockFactory = indexSettings.getValue(org.opensearch.index.store.FsDirectoryFactory.INDEX_LOCK_FACTOR_SETTING);
-            Files.createDirectories(location);
+            PrivilegedAccess.doPrivilegedIOException(() -> Files.createDirectories(location));
             return newFSDirectory(location, lockFactory, indexSettings);
         } catch (Exception e) {
             CryptoMetricsService.getInstance().recordError(ErrorType.DIRECTORY_CREATION_ERROR);
@@ -410,11 +410,18 @@ public class CryptoDirectoryFactory implements IndexStorePlugin.DirectoryFactory
         // Copy keyfile from source to target: copy to a temp file, fsync it, then atomically
         // rename it into place so a crash never leaves a partial keyfile behind. The temp name is
         // unique because several target shards may run this concurrently.
-        Path tempKeyfile = Files.createTempFile(targetIndexDirectory, "keyfile.resize.", ".tmp");
+        Path tempKeyfile = PrivilegedAccess
+            .doPrivilegedIOException(() -> Files.createTempFile(targetIndexDirectory, "keyfile.resize.", ".tmp"));
         try {
-            Files.copy(sourceKeyfile, tempKeyfile, StandardCopyOption.REPLACE_EXISTING);
+            PrivilegedAccess.doPrivilegedIOException(() -> {
+                Files.copy(sourceKeyfile, tempKeyfile, StandardCopyOption.REPLACE_EXISTING);
+                return null;
+            });
             IOUtils.fsync(tempKeyfile, false);
-            Files.move(tempKeyfile, targetKeyfile, StandardCopyOption.ATOMIC_MOVE);
+            PrivilegedAccess.doPrivilegedIOException(() -> {
+                Files.move(tempKeyfile, targetKeyfile, StandardCopyOption.ATOMIC_MOVE);
+                return null;
+            });
             IOUtils.fsync(targetIndexDirectory, true);
             LOGGER.debug("Successfully copied keyfile from {} to {} for resize operation", sourceKeyfile, targetKeyfile);
         } catch (IOException e) {
@@ -438,7 +445,6 @@ public class CryptoDirectoryFactory implements IndexStorePlugin.DirectoryFactory
      * @return the concrete implementation of the encrypted directory based on store type
      * @throws IOException if directory creation fails
      */
-    @Override
     public Directory newFSDirectory(Path location, LockFactory lockFactory, IndexSettings indexSettings) throws IOException {
         // Extract shardId from path structure: .../indices/{index-uuid}/{shard-id}/index/
         // location.getParent() gives us the shard directory

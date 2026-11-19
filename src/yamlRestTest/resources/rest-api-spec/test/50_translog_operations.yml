@@ -1,8 +1,5 @@
 ---
 "Test encrypted index translog basic operations":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -89,9 +86,6 @@
 
 ---
 "Test encrypted index translog recovery after close and reopen":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -211,9 +205,6 @@
 
 ---
 "Test encrypted index translog with sync durability settings":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index with request-level sync
   - do:
@@ -309,9 +300,6 @@
 
 ---
 "Test encrypted index translog flush and generation handling":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index with small flush threshold
   - do:
@@ -410,9 +398,6 @@
 
 ---
 "Test encrypted index large translog operations":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -519,9 +504,6 @@
 
 ---
 "Test encrypted index translog stats and monitoring":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:
@@ -596,9 +578,6 @@
 
 ---
 "Test encrypted index concurrent translog writes":
-  - skip:
-      version: " - 2.99.99"
-      reason: "storage-encryption plugin requires OpenSearch 3.0+"
 
   # Create encrypted index
   - do:

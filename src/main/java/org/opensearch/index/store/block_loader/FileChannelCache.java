@@ -13,8 +13,8 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.concurrent.TimeUnit;
 
+import org.opensearch.index.store.PrivilegedAccess;
 import org.opensearch.index.store.metrics.CryptoMetricsService;
-import org.opensearch.secure_sm.AccessController;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -62,23 +62,25 @@ public class FileChannelCache implements Closeable {
      */
     public FileChannelCache(int maxOpenFDs, long expireAfterAccessSeconds, OpenOption directOpenOption) {
         this.directOpenOption = directOpenOption;
-        Caffeine<String, RefCountedChannel> builder = Caffeine
-            .newBuilder()
-            .maximumSize(maxOpenFDs)
-            .recordStats()
-            .evictionListener((String path, RefCountedChannel ref, RemovalCause cause) -> {
-                // evictionListener fires synchronously and ONLY for automatic evictions
-                // (size pressure, time expiry). Manual invalidations are handled explicitly
-                // in invalidate(), invalidateByPathPrefix(), and close() to guarantee
-                // synchronous FileChannel closure and avoid FD leaks.
-                if (ref != null) {
-                    ref.releaseBase();
-                }
-            });
-        if (expireAfterAccessSeconds > 0) {
-            builder.expireAfterAccess(expireAfterAccessSeconds, TimeUnit.SECONDS);
-        }
-        this.fdCache = builder.build();
+        this.fdCache = PrivilegedAccess.doPrivileged(() -> {
+            Caffeine<String, RefCountedChannel> builder = Caffeine
+                .newBuilder()
+                .maximumSize(maxOpenFDs)
+                .recordStats()
+                .evictionListener((String path, RefCountedChannel ref, RemovalCause cause) -> {
+                    // evictionListener fires synchronously and ONLY for automatic evictions
+                    // (size pressure, time expiry). Manual invalidations are handled explicitly
+                    // in invalidate(), invalidateByPathPrefix(), and close() to guarantee
+                    // synchronous FileChannel closure and avoid FD leaks.
+                    if (ref != null) {
+                        ref.releaseBase();
+                    }
+                });
+            if (expireAfterAccessSeconds > 0) {
+                builder.expireAfterAccess(expireAfterAccessSeconds, TimeUnit.SECONDS);
+            }
+            return builder.build();
+        });
     }
 
     /**
@@ -204,7 +206,7 @@ public class FileChannelCache implements Closeable {
         try {
             // Privileged: a cache miss can open the file while untrusted code, such as a painless
             // script reading doc values, is on the stack, and that code has no file permissions.
-            FileChannel fc = AccessController.doPrivilegedChecked(() -> {
+            FileChannel fc = PrivilegedAccess.doPrivilegedIOException(() -> {
                 if (directOpenOption != null) {
                     return FileChannel.open(Paths.get(path), StandardOpenOption.READ, directOpenOption);
                 }

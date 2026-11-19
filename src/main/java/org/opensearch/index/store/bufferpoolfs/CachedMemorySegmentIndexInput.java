@@ -504,7 +504,7 @@ public class CachedMemorySegmentIndexInput extends IndexInput implements RandomA
     }
 
     @Override
-    public void readGroupVInt(int[] dst, int offset) throws IOException {
+    public void readGroupVInt(long[] dst, int offset) throws IOException {
         try {
             final MemorySegment segment;
             final int offsetInBlock;
