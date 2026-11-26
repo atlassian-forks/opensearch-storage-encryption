@@ -17,6 +17,13 @@ import org.opensearch.test.OpenSearchTestCase;
  */
 public class CryptoDirectoryFactoryProviderTests extends OpenSearchTestCase {
 
+    public void testPlaintextKeyAccessValues() {
+        var setting = CryptoDirectoryFactory.INDEX_KEY_ACCESS_SETTING;
+        assertEquals("allowed", setting.get(Settings.EMPTY));
+        assertEquals("revoked", setting.get(Settings.builder().put(setting.getKey(), "revoked").build()));
+        expectThrows(IllegalArgumentException.class, () -> setting.get(Settings.builder().put(setting.getKey(), "other").build()));
+    }
+
     public void testResolveCryptoProviderDefaultsToSunJceWhenOmitted() {
         Provider provider = CryptoDirectoryFactory.resolveCryptoProvider(Settings.EMPTY);
         assertNotNull(provider);

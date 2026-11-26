@@ -12,17 +12,14 @@ import java.nio.file.Path;
 import java.security.Provider;
 import java.security.Security;
 
-import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.FSLockFactory;
 import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.IndexOutput;
 import org.junit.After;
 import org.junit.Before;
-import org.opensearch.common.crypto.MasterKeyProvider;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.index.store.CaffeineThreadLeakFilter;
 import org.opensearch.index.store.CryptoDirectoryFactory;
-import org.opensearch.index.store.DummyKeyProvider;
 import org.opensearch.index.store.block.RefCountedMemorySegment;
 import org.opensearch.index.store.block_cache.BlockCache;
 import org.opensearch.index.store.block_cache.BlockCacheValue;
@@ -61,7 +58,6 @@ public class WriteCacheSettingTests extends OpenSearchTestCase {
 
         dirPath = createTempDir();
         Provider provider = Security.getProvider(DEFAULT_CRYPTO_PROVIDER);
-        MasterKeyProvider keyProvider = DummyKeyProvider.create();
 
         Settings nodeSettings = Settings
             .builder()
@@ -80,10 +76,9 @@ public class WriteCacheSettingTests extends OpenSearchTestCase {
 
         String indexUuid = randomAlphaOfLength(10);
         String indexName = randomAlphaOfLength(10);
-        FSDirectory fsDirectory = FSDirectory.open(dirPath);
         int shardId = 0;
 
-        KeyResolver keyResolver = new TestKeyResolver(indexUuid, indexName, fsDirectory, provider, keyProvider, shardId);
+        KeyResolver keyResolver = new TestKeyResolver();
         EncryptionMetadataCache encryptionMetadataCache = EncryptionMetadataCacheRegistry.getOrCreateCache(indexUuid, shardId, indexName);
 
         BlockLoader<RefCountedMemorySegment> loader = new CryptoDirectIOBlockLoader(

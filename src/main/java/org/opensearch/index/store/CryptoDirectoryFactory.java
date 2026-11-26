@@ -128,6 +128,14 @@ public class CryptoDirectoryFactory implements IndexStorePlugin.DirectoryFactory
      */
     public static final String CRYPTO_SETTING = "index.store.crypto";
 
+    /** Whether the index may obtain plaintext key material. */
+    public static final Setting<String> INDEX_KEY_ACCESS_SETTING = new Setting<>("index.store.crypto.key_access", "allowed", value -> {
+        if (!"allowed".equals(value) && !"revoked".equals(value)) {
+            throw new IllegalArgumentException("plaintext key access must be allowed or revoked");
+        }
+        return value;
+    }, Property.IndexScope, Property.Dynamic);
+
     /**
      * Default crypto provider name.
      */

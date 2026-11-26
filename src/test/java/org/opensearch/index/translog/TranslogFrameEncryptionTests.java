@@ -155,6 +155,24 @@ public class TranslogFrameEncryptionTests extends OpenSearchTestCase {
         }
     }
 
+    public void testRevokedKeyAccessRejectsPreviouslyDecryptedFrame() throws IOException {
+        Key key = keyResolver.getDataKey();
+        AtomicBoolean allowed = new AtomicBoolean(true);
+        keyResolver = () -> {
+            if (!allowed.get())
+                throw new SecurityException("revoked");
+            return key;
+        };
+        try (CryptoFileChannelWrapper channel = open(path, WRITE)) {
+            Written w = writeOps(channel, 1);
+            assertArrayEquals(w.ops.get(0), readFully(channel, w.offsets.get(0), w.ops.get(0).length));
+            allowed.set(false);
+            expectThrows(SecurityException.class, () -> readFully(channel, w.offsets.get(0), w.ops.get(0).length));
+            allowed.set(true);
+            assertArrayEquals(w.ops.get(0), readFully(channel, w.offsets.get(0), w.ops.get(0).length));
+        }
+    }
+
     public void testReadOfJustWrittenOpWhileWriterOpen() throws IOException {
         try (CryptoFileChannelWrapper writer = open(path, WRITE)) {
             Written w = writeOps(writer, 1);

@@ -14,7 +14,6 @@ import java.security.Provider;
 import java.security.Security;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.FSLockFactory;
 import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.IndexInput;
@@ -22,12 +21,10 @@ import org.apache.lucene.store.IndexOutput;
 import org.junit.After;
 import org.junit.Before;
 import org.opensearch.cluster.routing.allocation.DiskThresholdSettings;
-import org.opensearch.common.crypto.MasterKeyProvider;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.index.store.CaffeineThreadLeakFilter;
 import org.opensearch.index.store.CryptoDirectoryFactory;
-import org.opensearch.index.store.DummyKeyProvider;
 import org.opensearch.index.store.PanamaNativeAccess;
 import org.opensearch.index.store.block.RefCountedMemorySegment;
 import org.opensearch.index.store.block_cache.BlockCache;
@@ -102,16 +99,14 @@ public class CachedMemorySegmentIndexInputFromDirectoryTests extends BaseIndexIn
         PanamaNativeAccess.setFileSystemBlockSizeOverride(4096);
         Path path = createTempDir();
         Provider provider = Security.getProvider(DEFAULT_CRYPTO_PROVIDER);
-        MasterKeyProvider keyProvider = DummyKeyProvider.create();
         this.poolResources = PoolBuilder.build(createNodeSettings());
         Pool<RefCountedMemorySegment> segmentPool = poolResources.getSegmentPool();
 
         String indexUuid = randomAlphaOfLength(10);
         String indexName = randomAlphaOfLength(10);
-        FSDirectory fsDirectory = FSDirectory.open(path);
         int shardId = 0;
 
-        KeyResolver keyResolver = new TestKeyResolver(indexUuid, indexName, fsDirectory, provider, keyProvider, shardId);
+        KeyResolver keyResolver = new TestKeyResolver();
 
         EncryptionMetadataCache encryptionMetadataCache = EncryptionMetadataCacheRegistry.getOrCreateCache(indexUuid, shardId, indexName);
 

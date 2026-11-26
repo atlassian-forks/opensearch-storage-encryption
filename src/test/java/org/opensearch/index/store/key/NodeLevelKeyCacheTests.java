@@ -18,6 +18,7 @@ import java.lang.reflect.Field;
 import java.security.Key;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -247,6 +248,58 @@ public class NodeLevelKeyCacheTests extends OpenSearchTestCase {
 
         // Should have loaded twice (once before eviction, once after)
         verify(mockResolver, times(2)).loadKeyFromMasterKeyProvider();
+    }
+
+    public void testExplicitRevocationStopsReloadDespiteAvailableProviderAndPreservesOtherIndex() throws Exception {
+        MasterKeyHealthMonitor.initialize(Settings.EMPTY, mockClient, mockClusterService);
+        NodeLevelKeyCache.initialize(Settings.EMPTY, MasterKeyHealthMonitor.getInstance());
+        NodeLevelKeyCache cache = NodeLevelKeyCache.getInstance();
+        registerMockResolver("tenant-a", 0);
+        registerMockResolver("tenant-a", 1);
+        registerMockResolver("tenant-b", 0);
+        cache.get("tenant-a", 0, "test-index");
+        cache.get("tenant-a", 1, "test-index");
+        cache.get("tenant-b", 0, "test-index");
+
+        cache.revokeIndex("tenant-a");
+
+        expectThrows(SecurityException.class, () -> cache.get("tenant-a", 0, "test-index"));
+        expectThrows(SecurityException.class, () -> cache.get("tenant-a", 1, "test-index"));
+        expectThrows(SecurityException.class, () -> cache.refreshKey("tenant-a", 0, "test-index"));
+        assertEquals(testKey1, cache.get("tenant-b", 0, "test-index"));
+        verify(mockResolver, times(3)).loadKeyFromMasterKeyProvider();
+
+        cache.restoreIndex("tenant-a");
+        assertEquals(testKey1, cache.get("tenant-a", 0, "test-index"));
+        verify(mockResolver, times(4)).loadKeyFromMasterKeyProvider();
+    }
+
+    public void testRevocationFencesAnInFlightKeyLoad() throws Exception {
+        MasterKeyHealthMonitor.initialize(Settings.EMPTY, mockClient, mockClusterService);
+        NodeLevelKeyCache.initialize(Settings.EMPTY, MasterKeyHealthMonitor.getInstance());
+        NodeLevelKeyCache cache = NodeLevelKeyCache.getInstance();
+        registerMockResolver("tenant-a", 0);
+        CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        when(mockResolver.loadKeyFromMasterKeyProvider()).thenAnswer(invocation -> {
+            started.countDown();
+            assertTrue(release.await(10, TimeUnit.SECONDS));
+            return testKey1;
+        });
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            var load = executor.submit(() -> cache.get("tenant-a", 0, "test-index"));
+            assertTrue(started.await(10, TimeUnit.SECONDS));
+            var revoke = executor.submit(() -> cache.revokeIndex("tenant-a"));
+            revoke.get(2, TimeUnit.SECONDS);
+            release.countDown();
+            expectThrows(ExecutionException.class, () -> load.get(10, TimeUnit.SECONDS));
+            expectThrows(SecurityException.class, () -> cache.get("tenant-a", 0, "test-index"));
+            verify(mockResolver, times(1)).loadKeyFromMasterKeyProvider();
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+        }
     }
 
     public void testSize() throws Exception {

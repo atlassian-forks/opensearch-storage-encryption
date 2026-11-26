@@ -19,6 +19,7 @@ import org.apache.lucene.store.IndexOutput;
 import org.apache.lucene.store.LockFactory;
 import org.apache.lucene.store.NIOFSDirectory;
 import org.opensearch.common.util.io.IOUtils;
+import org.opensearch.index.store.KeyAccessIndexOutput;
 import org.opensearch.index.store.cipher.EncryptionMetadataCache;
 import org.opensearch.index.store.footer.EncryptionFooter;
 import org.opensearch.index.store.footer.EncryptionMetadataTrailer;
@@ -91,7 +92,7 @@ public class CryptoNIOFSDirectory extends NIOFSDirectory {
                     this.provider
                 );
                 success = true;
-                return indexInput;
+                return new KeyAccessIndexInput(indexInput, keyResolver::checkAccess);
             } finally {
                 if (!success) {
                     IOUtils.closeWhileHandlingException(fc);
@@ -110,21 +111,7 @@ public class CryptoNIOFSDirectory extends NIOFSDirectory {
                 return super.createOutput(name, context);
             }
 
-            ensureOpen();
-            Path path = directory.resolve(name);
-
-            OutputStream fos = Files.newOutputStream(path, StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW);
-
-            return new CryptoOutputStreamIndexOutput(
-                name,
-                path,
-                fos,
-                this.keyResolver,
-                provider,
-                algorithmId,
-                path,
-                this.encryptionMetadataCache
-            );
+            return createEncryptedOutput(name);
         } catch (Exception e) {
             CryptoMetricsService.getInstance().recordError(ErrorType.INDEX_OUTPUT_ERROR);
             throw e;
@@ -137,21 +124,34 @@ public class CryptoNIOFSDirectory extends NIOFSDirectory {
             return super.createTempOutput(prefix, suffix, context);
         }
 
+        return createEncryptedOutput(getTempFileName(prefix, suffix, nextTempFileCounter.getAndIncrement()));
+    }
+
+    private IndexOutput createEncryptedOutput(String name) throws IOException {
         ensureOpen();
-        String name = getTempFileName(prefix, suffix, nextTempFileCounter.getAndIncrement());
+        keyResolver.checkAccess();
         Path path = directory.resolve(name);
         OutputStream fos = Files.newOutputStream(path, StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW);
-
-        return new CryptoOutputStreamIndexOutput(
-            name,
-            path,
-            fos,
-            this.keyResolver,
-            provider,
-            algorithmId,
-            path,
-            this.encryptionMetadataCache
-        );
+        boolean success = false;
+        try {
+            CryptoOutputStreamIndexOutput output = new CryptoOutputStreamIndexOutput(
+                name,
+                path,
+                fos,
+                keyResolver,
+                provider,
+                algorithmId,
+                path,
+                encryptionMetadataCache
+            );
+            success = true;
+            return new KeyAccessIndexOutput(output, keyResolver::checkAccess, output::abort);
+        } finally {
+            if (!success) {
+                IOUtils.closeWhileHandlingException(fos);
+                IOUtils.deleteFilesIgnoringExceptions(path);
+            }
+        }
     }
 
     @Override

@@ -26,4 +26,9 @@ public interface KeyResolver {
      * @return the decrypted symmetric {@link Key}, typically AES
      */
     Key getDataKey();
+
+    /** Checks whether the index may still use cached plaintext. */
+    default void checkAccess() {
+        getDataKey();
+    }
 }

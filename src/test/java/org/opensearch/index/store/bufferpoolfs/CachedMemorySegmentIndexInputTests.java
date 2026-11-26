@@ -20,6 +20,7 @@ import java.lang.foreign.ValueLayout;
 import java.nio.ByteOrder;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.Before;
 import org.opensearch.index.store.block.RefCountedMemorySegment;
@@ -56,6 +57,42 @@ public class CachedMemorySegmentIndexInputTests extends OpenSearchTestCase {
         mockReadaheadContext = mock(ReadaheadContext.class);
         testPath = Paths.get("/test/exhaustive.dat");
         arena = Arena.ofAuto();
+    }
+
+    public void testRevokedAccessStopsPinnedReaderAndItsSlices() throws IOException {
+        var allowed = new AtomicBoolean(true);
+        MemorySegment block = createBlockWithPattern(0, (byte) 7);
+        setupOneBlock(block);
+        Runnable accessCheck = () -> {
+            if (!allowed.get())
+                throw new SecurityException("revoked");
+        };
+        var input = CachedMemorySegmentIndexInput
+            .newInstance(
+                "guarded",
+                testPath,
+                BLOCK_SIZE,
+                mockCache,
+                mockReadaheadManager,
+                mockReadaheadContext,
+                mockTinyCache,
+                accessCheck
+            );
+        var clone = input.clone();
+        var slice = input.slice("slice", 0, 2);
+        try {
+            assertEquals((byte) 7, input.readByte());
+            allowed.set(false);
+            expectThrows(SecurityException.class, () -> input.readByte());
+            expectThrows(SecurityException.class, () -> clone.readByte());
+            expectThrows(SecurityException.class, () -> slice.readByte());
+            allowed.set(true);
+            assertEquals((byte) 7, input.readByte());
+        } finally {
+            clone.close();
+            slice.close();
+            input.close();
+        }
     }
 
     /**

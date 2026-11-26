@@ -15,6 +15,7 @@ import java.lang.foreign.MemorySegment;
 import java.nio.file.Path;
 import java.security.Key;
 import java.security.Provider;
+import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.logging.log4j.LogManager;
@@ -49,6 +50,7 @@ public final class BufferIOWithCaching extends OutputStreamIndexOutput {
 
     private static final int CHUNK_SIZE = CACHE_BLOCK_SIZE;
     private static final int BUFFER_SIZE = 65_536;
+    private final EncryptedOutputStream encryptedStream;
 
     private static final int BLOCK = 1 << CACHE_BLOCK_SIZE_POWER;
     private static final int BLOCK_MASK = BLOCK - 1;
@@ -78,12 +80,17 @@ public final class BufferIOWithCaching extends OutputStreamIndexOutput {
         EncryptionMetadataCache encryptionMetadataCache
     )
         throws IOException {
-        super(
-            "FSIndexOutput(path=\"" + path + "\")",
-            name,
-            new EncryptedOutputStream(os, path, key, memorySegmentPool, blockCache, provider, encryptionMetadataCache),
-            CHUNK_SIZE
-        );
+        this(name, path, new EncryptedOutputStream(os, path, key, memorySegmentPool, blockCache, provider, encryptionMetadataCache));
+    }
+
+    private BufferIOWithCaching(String name, Path path, EncryptedOutputStream stream) {
+        super("FSIndexOutput(path=\"" + path + "\")", name, stream, CHUNK_SIZE);
+        this.encryptedStream = stream;
+    }
+
+    /** Release the file without flushing buffered data or completing an encrypted footer. */
+    public void abort() throws IOException {
+        encryptedStream.abort();
     }
 
     private static class EncryptedOutputStream extends FilterOutputStream {
@@ -389,6 +396,24 @@ public final class BufferIOWithCaching extends OutputStreamIndexOutput {
 
             if (exception != null)
                 throw exception;
+        }
+
+        private void abort() throws IOException {
+            if (isClosed)
+                return;
+            isClosed = true;
+            Arrays.fill(buffer, (byte) 0);
+            Arrays.fill(partialBlockBuffer, (byte) 0);
+            if (currentCipher != null) {
+                OpenSslNativeCipher.freeCipherContext(currentCipher);
+                currentCipher = null;
+            }
+            try {
+                blockCache.invalidate(path);
+                encryptionMetadataCache.invalidateFile(normalizedPath);
+            } finally {
+                out.close();
+            }
         }
 
         private void cacheFinalPartialBlock() {

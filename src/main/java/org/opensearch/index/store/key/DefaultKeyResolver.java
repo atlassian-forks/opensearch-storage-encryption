@@ -41,6 +41,7 @@ public class DefaultKeyResolver implements KeyResolver {
     private final Directory directory;
     private final MasterKeyProvider keyProvider;
     private final int shardId;
+    private final NodeLevelKeyCache.IndexKeyGate indexGate;
 
     private static final String KEY_FILE = "keyfile";
     private static final String KEY_FILE_TEMP_SUFFIX = "tmp";
@@ -70,6 +71,8 @@ public class DefaultKeyResolver implements KeyResolver {
         this.directory = directory;
         this.keyProvider = keyProvider;
         this.shardId = shardId;
+        this.indexGate = NodeLevelKeyCache.getInstance().indexGate(indexUuid);
+        checkAccess();
         initialize(shardId);
     }
 
@@ -157,6 +160,7 @@ public class DefaultKeyResolver implements KeyResolver {
      * Exceptions are allowed to bubble up - the cache will handle fallback to old value.
      */
     Key loadKeyFromMasterKeyProvider() throws Exception {
+        checkAccess();
         // Attempt decryption
         try {
             byte[] encryptedKey = readByteArrayFile(KEY_FILE);
@@ -169,15 +173,15 @@ public class DefaultKeyResolver implements KeyResolver {
 
     }
 
-    /**
-     * {@inheritDoc}
-     * Returns the master key. File-specific keys are derived on-demand from master key + messageId.
-     * The cache handles MasterKey Provider failures by returning the last known key.
-     */
+    @Override
+    public void checkAccess() {
+        NodeLevelKeyCache.requireKeyAccess(indexGate);
+    }
+
     @Override
     public Key getDataKey() {
         try {
-            return NodeLevelKeyCache.getInstance().get(indexUuid, shardId, indexName);
+            return NodeLevelKeyCache.getInstance().get(indexUuid, shardId, indexName, indexGate);
         } catch (Exception e) {
             // If it's already a KeyCacheException with clean message, just rethrow
             if (e instanceof KeyCacheException) {

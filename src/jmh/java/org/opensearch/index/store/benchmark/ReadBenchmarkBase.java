@@ -13,7 +13,6 @@ import java.security.Provider;
 import java.security.Security;
 import java.util.Random;
 
-import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.FSLockFactory;
 import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.IndexInput;
@@ -22,7 +21,6 @@ import org.apache.lucene.store.MMapDirectory;
 import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.State;
-import org.opensearch.common.crypto.MasterKeyProvider;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.index.store.CryptoDirectoryFactory;
 import org.opensearch.index.store.block.RefCountedMemorySegment;
@@ -126,7 +124,6 @@ public class ReadBenchmarkBase {
 
     private void setupBufferPoolDirectory() throws Exception {
         Provider provider = Security.getProvider(DEFAULT_CRYPTO_PROVIDER);
-        MasterKeyProvider keyProvider = BenchmarkKeyProvider.create();
 
         Settings nodeSettings = Settings
             .builder()
@@ -141,10 +138,9 @@ public class ReadBenchmarkBase {
 
         String indexUuid = "bench-idx-" + System.nanoTime();
         String indexName = "bench-index";
-        FSDirectory fsDir = FSDirectory.open(bufferPoolPath);
         int shardId = 0;
 
-        KeyResolver keyResolver = new TestKeyResolver(indexUuid, indexName, fsDir, provider, keyProvider, shardId);
+        KeyResolver keyResolver = new TestKeyResolver();
 
         EncryptionMetadataCache encMetaCache = EncryptionMetadataCacheRegistry.getOrCreateCache(indexUuid, shardId, indexName);
 

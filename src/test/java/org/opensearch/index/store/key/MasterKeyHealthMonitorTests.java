@@ -233,6 +233,13 @@ public class MasterKeyHealthMonitorTests extends OpenSearchTestCase {
         assertFalse("Failure should be cleared from tracker", tracker.containsKey(TEST_INDEX_UUID));
     }
 
+    public void testIntentionalPlaintextKeyRevocationDoesNotApplyBlocks() {
+        Settings settings = Settings.builder().put("index.store.crypto.key_access", "revoked").build();
+        when(mockIndexMetadata.getSettings()).thenReturn(settings);
+        monitor.reportFailure(TEST_INDEX_UUID, TEST_INDEX_NAME, new SecurityException("revoked"), FailureType.CRITICAL);
+        verify(mockIndicesAdminClient, never()).updateSettings(any(UpdateSettingsRequest.class));
+    }
+
     /**
      * Success when no blocks exist is safe
      */
