@@ -382,6 +382,12 @@ public class TranslogChunkManager {
 
     /** Reads, authenticates and decrypts a frame. */
     private byte[] decryptFrame(Frame frame) throws IOException {
+        try {
+            keyResolver.checkAccess();
+        } catch (RuntimeException revoked) {
+            lastDecrypted = null;
+            throw revoked;
+        }
         DecryptedFrame cached = lastDecrypted;
         if (cached != null && cached.index() == frame.index()) {
             return cached.plaintext();

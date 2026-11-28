@@ -4,22 +4,22 @@
  */
 package org.opensearch.index.store.bufferpoolfs;
 
+import static org.mockito.Mockito.mock;
 import static org.opensearch.index.store.CryptoDirectoryFactory.DEFAULT_CRYPTO_PROVIDER;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.Provider;
 import java.security.Security;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.lucene.store.AlreadyClosedException;
-import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.FSLockFactory;
 import org.apache.lucene.store.IOContext;
 import org.junit.After;
 import org.junit.Before;
-import org.opensearch.common.crypto.MasterKeyProvider;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.index.store.CryptoDirectoryFactory;
-import org.opensearch.index.store.DummyKeyProvider;
 import org.opensearch.index.store.block.RefCountedMemorySegment;
 import org.opensearch.index.store.block_cache.BlockCache;
 import org.opensearch.index.store.block_cache.CaffeineBlockCache;
@@ -28,9 +28,11 @@ import org.opensearch.index.store.block_loader.CryptoDirectIOBlockLoader;
 import org.opensearch.index.store.cipher.EncryptionMetadataCache;
 import org.opensearch.index.store.cipher.EncryptionMetadataCacheRegistry;
 import org.opensearch.index.store.key.KeyResolver;
+import org.opensearch.index.store.metrics.CryptoMetricsService;
 import org.opensearch.index.store.pool.Pool;
 import org.opensearch.index.store.pool.PoolBuilder;
 import org.opensearch.index.store.read_ahead.Worker;
+import org.opensearch.telemetry.metrics.MetricsRegistry;
 import org.opensearch.test.OpenSearchTestCase;
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope;
@@ -43,7 +45,9 @@ public class BufferPoolDirectoryTests extends OpenSearchTestCase {
 
     private BufferPoolDirectory directory;
     private PoolBuilder.PoolResources poolResources;
+    private EncryptionMetadataCache encryptionMetadataCache;
     private boolean originalWriteCacheEnabled;
+    private final AtomicBoolean keyAllowed = new AtomicBoolean(true);
 
     @Before
     public void setUp() throws Exception {
@@ -53,7 +57,6 @@ public class BufferPoolDirectoryTests extends OpenSearchTestCase {
 
         Path path = createTempDir();
         Provider provider = Security.getProvider(DEFAULT_CRYPTO_PROVIDER);
-        MasterKeyProvider keyProvider = DummyKeyProvider.create();
 
         Settings nodeSettings = Settings
             .builder()
@@ -68,11 +71,16 @@ public class BufferPoolDirectoryTests extends OpenSearchTestCase {
 
         String indexUuid = randomAlphaOfLength(10);
         String indexName = randomAlphaOfLength(10);
-        FSDirectory fsDirectory = FSDirectory.open(path);
         int shardId = 0;
 
-        KeyResolver keyResolver = new TestKeyResolver(indexUuid, indexName, fsDirectory, provider, keyProvider, shardId);
-        EncryptionMetadataCache encryptionMetadataCache = EncryptionMetadataCacheRegistry.getOrCreateCache(indexUuid, shardId, indexName);
+        KeyResolver underlying = new TestKeyResolver();
+        KeyResolver keyResolver = () -> {
+            if (!keyAllowed.get()) {
+                throw new SecurityException("revoked");
+            }
+            return underlying.getDataKey();
+        };
+        encryptionMetadataCache = EncryptionMetadataCacheRegistry.getOrCreateCache(indexUuid, shardId, indexName);
 
         BlockLoader<RefCountedMemorySegment> loader = new CryptoDirectIOBlockLoader(
             segmentPool,
@@ -120,6 +128,62 @@ public class BufferPoolDirectoryTests extends OpenSearchTestCase {
         }
         this.poolResources.close();
         super.tearDown();
+    }
+
+    public void testNewOutputRequiresCurrentKeyAccess() throws Exception {
+        CryptoMetricsService.initialize(mock(MetricsRegistry.class));
+        keyAllowed.set(false);
+        expectThrows(SecurityException.class, () -> directory.createOutput("revoked.fdt", IOContext.DEFAULT));
+        expectThrows(SecurityException.class, () -> directory.createTempOutput("revoked", "fdt", IOContext.DEFAULT));
+        assertFalse(Files.exists(directory.getDirectory().resolve("revoked.fdt")));
+    }
+
+    public void testRevokedOpenDoesNotRepopulateFooterCache() throws Exception {
+        CryptoMetricsService.initialize(mock(MetricsRegistry.class));
+        String name = "revoked.fdt";
+        try (var output = directory.createOutput(name, IOContext.DEFAULT)) {
+            output.writeByte((byte) 42);
+        }
+        String path = EncryptionMetadataCache.normalizePath(directory.getDirectory().resolve(name));
+        encryptionMetadataCache.invalidateDirectory();
+        assertNull(encryptionMetadataCache.getFileKey(path));
+
+        keyAllowed.set(false);
+        expectThrows(SecurityException.class, () -> directory.openInput(name, IOContext.DEFAULT));
+        assertNull("Revoked open must not derive and cache a file key", encryptionMetadataCache.getFileKey(path));
+    }
+
+    public void testExistingOutputDeniesBufferedWritesAndResumesAfterRestore() throws Exception {
+        var output = directory.createOutput("resume.fdt", IOContext.DEFAULT);
+        output.writeByte((byte) 11);
+        keyAllowed.set(false);
+        expectThrows(SecurityException.class, () -> output.writeByte((byte) 12));
+        expectThrows(SecurityException.class, () -> output.writeBytes(new byte[] { 12 }, 1));
+        expectThrows(SecurityException.class, output::getChecksum);
+        keyAllowed.set(true);
+        output.writeByte((byte) 13);
+        output.close();
+        try (var input = directory.openInput("resume.fdt", IOContext.DEFAULT)) {
+            assertEquals((byte) 11, input.readByte());
+            keyAllowed.set(false);
+            expectThrows(SecurityException.class, input::readByte);
+            keyAllowed.set(true);
+            assertEquals((byte) 13, input.readByte());
+        }
+    }
+
+    public void testCloseWhileRevokedDoesNotFlushBufferedBytes() throws Exception {
+        var output = directory.createTempOutput("aborted", "fdt", IOContext.DEFAULT);
+        output.writeBytes(new byte[100_000], 100_000);
+        output.writeByte((byte) 99);
+        Path path = directory.getDirectory().resolve(output.getName());
+        long size = Files.size(path);
+        keyAllowed.set(false);
+        expectThrows(SecurityException.class, output::close);
+        assertEquals(size, Files.size(path));
+        keyAllowed.set(true);
+        expectThrows(AlreadyClosedException.class, () -> output.writeByte((byte) 100));
+        directory.deleteFile(output.getName());
     }
 
     /**

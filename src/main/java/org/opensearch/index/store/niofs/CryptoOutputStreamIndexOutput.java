@@ -11,6 +11,7 @@ import java.lang.foreign.MemorySegment;
 import java.nio.file.Path;
 import java.security.Key;
 import java.security.Provider;
+import java.util.Arrays;
 
 import org.apache.lucene.store.OutputStreamIndexOutput;
 import org.opensearch.common.SuppressForbidden;
@@ -35,6 +36,7 @@ public final class CryptoOutputStreamIndexOutput extends OutputStreamIndexOutput
 
     private static final int CHUNK_SIZE = 8_192;
     private static final int BUFFER_SIZE = 65_536;
+    private final EncryptedOutputStream encryptedStream;
 
     /**
      * Creates a new CryptoIndexOutput with per-file key derivation
@@ -55,12 +57,17 @@ public final class CryptoOutputStreamIndexOutput extends OutputStreamIndexOutput
         Path filePath,
         EncryptionMetadataCache encryptionMetadataCache
     ) {
-        super(
-            "FSIndexOutput(path=\"" + path + "\")",
-            name,
-            new EncryptedOutputStream(os, keyResolver, provider, algorithmId, filePath, encryptionMetadataCache),
-            CHUNK_SIZE
-        );
+        this(name, path, new EncryptedOutputStream(os, keyResolver, provider, algorithmId, filePath, encryptionMetadataCache));
+    }
+
+    private CryptoOutputStreamIndexOutput(String name, Path path, EncryptedOutputStream stream) {
+        super("FSIndexOutput(path=\"" + path + "\")", name, stream, CHUNK_SIZE);
+        this.encryptedStream = stream;
+    }
+
+    /** Release the file without flushing buffered data or completing an encrypted footer. */
+    public void abort() throws IOException {
+        encryptedStream.abort();
     }
 
     private static class EncryptedOutputStream extends FilterOutputStream {
@@ -223,6 +230,22 @@ public final class CryptoOutputStreamIndexOutput extends OutputStreamIndexOutput
 
             if (exception != null)
                 throw exception;
+        }
+
+        private void abort() throws IOException {
+            if (isClosed)
+                return;
+            isClosed = true;
+            Arrays.fill(buffer, (byte) 0);
+            if (currentCipher != null) {
+                OpenSslNativeCipher.freeCipherContext(currentCipher);
+                currentCipher = null;
+            }
+            try {
+                encryptionMetadataCache.invalidateFile(normalizedFilePath);
+            } finally {
+                out.close();
+            }
         }
 
         private void checkClosed() throws IOException {

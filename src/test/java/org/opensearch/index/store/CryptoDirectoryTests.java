@@ -7,7 +7,6 @@ package org.opensearch.index.store;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -47,19 +46,10 @@ public class CryptoDirectoryTests extends OpenSearchBaseDirectoryTestCase {
         // Create mock metricService
         CryptoMetricsService.initialize(mock(MetricsRegistry.class));
 
-        // Create raw AES key
-        byte[] rawKey = new byte[32]; // 256-bit AES key
-        byte[] encryptedKey = new byte[32]; // Not used in test but needed for interface
-        java.util.Random rnd = Randomness.get();
-        rnd.nextBytes(rawKey);
-        rnd.nextBytes(encryptedKey);
-
-        // Create mock KeyIvResolver
-        KeyResolver keyResolver = mock(KeyResolver.class);
-        byte[] iv = new byte[16]; // 128-bit IV for AES/CTR
-        rnd.nextBytes(iv);
-
-        when(keyResolver.getDataKey()).thenReturn(new SecretKeySpec(rawKey, "AES"));
+        byte[] rawKey = new byte[32];
+        Randomness.get().nextBytes(rawKey);
+        SecretKeySpec key = new SecretKeySpec(rawKey, "AES");
+        KeyResolver keyResolver = () -> key;
 
         Provider provider = Security.getProvider("SunJCE");
         assertNotNull("Provider should not be null", provider);

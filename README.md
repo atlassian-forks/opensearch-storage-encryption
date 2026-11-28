@@ -180,8 +180,11 @@ Configure these when creating an index. Setting `index.store.type` to `"cryptofs
 | `index.store.type` | **Set to `"cryptofs"` to enable encryption** | String | `cryptofs` (for encryption) or standard types (`niofs`, `hybridfs`, `mmapfs`, `simplefs`) |
 | `index.store.crypto.provider` | Crypto provider for encryption | String | Any registered Java Security provider |
 | `index.store.crypto.key_provider` | Key management provider type **(required when using cryptofs)** | String | `aws-kms`, `dummy` (testing only) |
+| `index.store.crypto.key_access` | Dynamic access setting for an encrypted index | String | `allowed` (default), `revoked` |
 | `index.store.crypto.kms.key_arn` | AWS KMS key ARN (master key) **(required when using cryptofs)** | String | Valid AWS KMS ARN format |
 | `index.store.crypto.kms.encryption_context` | AWS KMS encryption context **(required when using cryptofs)** | String | Additional authenticated data for KMS |
+
+To deny key access for an encrypted index, set `index.store.crypto.key_access` to `revoked` with the update index settings API. Each node enforces the setting when it applies the cluster state update and releases that index's local scroll and point-in-time contexts. Set it back to `allowed` to restore access when the shards are ready. Create fresh scrolls and point-in-time contexts after restoration.
 
 **How Encryption Works:**
 - When you set `index.store.type: "cryptofs"`, the plugin automatically wraps the node's default store type with encryption

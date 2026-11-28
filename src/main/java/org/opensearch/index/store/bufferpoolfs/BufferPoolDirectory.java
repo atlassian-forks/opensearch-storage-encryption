@@ -25,6 +25,7 @@ import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.store.IndexOutput;
 import org.apache.lucene.store.LockFactory;
 import org.opensearch.common.SuppressForbidden;
+import org.opensearch.index.store.KeyAccessIndexOutput;
 import org.opensearch.index.store.block.RefCountedMemorySegment;
 import org.opensearch.index.store.block_cache.BlockCache;
 import org.opensearch.index.store.block_cache.CaffeineBlockCache;
@@ -76,6 +77,7 @@ public class BufferPoolDirectory extends FSDirectory {
     private final Provider provider;
     private final Path dirPath;
     private final byte[] masterKeyBytes;
+    private final KeyResolver keyResolver;
     private final EncryptionMetadataCache encryptionMetadataCache;
     private final FileChannelCache fileChannelCache;
 
@@ -111,6 +113,7 @@ public class BufferPoolDirectory extends FSDirectory {
         this.readAheadworker = worker;
         this.provider = provider;
         this.dirPath = getDirectory();
+        this.keyResolver = keyResolver;
         this.masterKeyBytes = keyResolver.getDataKey().getEncoded();
         this.encryptionMetadataCache = encryptionMetadataCache;
         this.fileChannelCache = fileChannelCache;
@@ -145,7 +148,8 @@ public class BufferPoolDirectory extends FSDirectory {
                     blockCache,
                     readAheadManager,
                     readAheadContext,
-                    pinRegistry
+                    pinRegistry,
+                    keyResolver::checkAccess
                 );
         } catch (Exception e) {
             CryptoMetricsService.getInstance().recordError(ErrorType.INDEX_INPUT_ERROR);
@@ -160,20 +164,7 @@ public class BufferPoolDirectory extends FSDirectory {
                 return super.createOutput(name, context);
             }
 
-            ensureOpen();
-            Path path = directory.resolve(name);
-            OutputStream fos = Files.newOutputStream(path, StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW);
-
-            return new BufferIOWithCaching(
-                name,
-                path,
-                fos,
-                masterKeyBytes,
-                this.memorySegmentPool,
-                this.blockCache,
-                this.provider,
-                this.encryptionMetadataCache
-            );
+            return createEncryptedOutput(name);
         } catch (Exception e) {
             CryptoMetricsService.getInstance().recordError(ErrorType.INDEX_OUTPUT_ERROR);
             throw e;
@@ -186,12 +177,16 @@ public class BufferPoolDirectory extends FSDirectory {
             return super.createTempOutput(prefix, suffix, context);
         }
 
+        return createEncryptedOutput(getTempFileName(prefix, suffix, nextTempFileCounter.getAndIncrement()));
+    }
+
+    private IndexOutput createEncryptedOutput(String name) throws IOException {
         ensureOpen();
-        String name = getTempFileName(prefix, suffix, nextTempFileCounter.getAndIncrement());
+        keyResolver.checkAccess();
         Path path = directory.resolve(name);
         OutputStream fos = Files.newOutputStream(path, StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW);
 
-        return new BufferIOWithCaching(
+        BufferIOWithCaching output = new BufferIOWithCaching(
             name,
             path,
             fos,
@@ -201,6 +196,7 @@ public class BufferPoolDirectory extends FSDirectory {
             this.provider,
             this.encryptionMetadataCache
         );
+        return new KeyAccessIndexOutput(output, keyResolver::checkAccess, output::abort);
     }
 
     // only close resources owned by this directory type.
@@ -280,6 +276,7 @@ public class BufferPoolDirectory extends FSDirectory {
         }
 
         // Cache miss - read footer from disk (happens during file open before cache populated)
+        keyResolver.checkAccess();
         try (FileChannel channel = FileChannel.open(file, StandardOpenOption.READ)) {
             EncryptionFooter footer = EncryptionFooter
                 .readViaFileChannel(normalizedPath, channel, masterKeyBytes, encryptionMetadataCache, provider);

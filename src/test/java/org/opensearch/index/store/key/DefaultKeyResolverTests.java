@@ -10,6 +10,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -118,6 +119,33 @@ public class DefaultKeyResolverTests extends OpenSearchTestCase {
         @SuppressWarnings("unchecked")
         ConcurrentMap<ShardCacheKey, KeyResolver> resolverCache = (ConcurrentMap<ShardCacheKey, KeyResolver>) resolverCacheField.get(null);
         resolverCache.put(new ShardCacheKey(indexUuid, shardId, "test-index"), resolver);
+    }
+
+    public void testAccessCheckUsesLocalRevocationWithoutLoadingAKey() throws Exception {
+        byte[] raw = new byte[32];
+        byte[] encrypted = new byte[32];
+        when(mockKeyProvider.generateDataPair()).thenReturn(new DataKeyPair(raw, encrypted));
+        when(mockKeyProvider.decryptKey(any())).thenReturn(raw);
+        var resolver = new DefaultKeyResolver(TEST_INDEX_UUID, "test-index", directory, provider, mockKeyProvider, TEST_SHARD_ID);
+        registerResolver(TEST_INDEX_UUID, TEST_SHARD_ID, resolver);
+        resolver.getDataKey();
+        NodeLevelKeyCache.getInstance().evict(TEST_INDEX_UUID, TEST_SHARD_ID, "test-index");
+        when(mockKeyProvider.decryptKey(any())).thenThrow(new SecurityException("provider revoked"));
+        resolver.checkAccess();
+        verify(mockKeyProvider).decryptKey(any());
+        NodeLevelKeyCache.getInstance().revokeIndex(TEST_INDEX_UUID);
+        expectThrows(SecurityException.class, resolver::checkAccess);
+        expectThrows(KeyCacheException.class, resolver::getDataKey);
+        NodeLevelKeyCache.getInstance().restoreIndex(TEST_INDEX_UUID);
+        resolver.checkAccess();
+        verify(mockKeyProvider).decryptKey(any());
+
+        var cache = NodeLevelKeyCache.getInstance();
+        cache.removeIndex(TEST_INDEX_UUID);
+        assertFalse(cache.isIndexRevoked(TEST_INDEX_UUID));
+        expectThrows(SecurityException.class, resolver::checkAccess);
+        expectThrows(KeyCacheException.class, resolver::getDataKey);
+        verify(mockKeyProvider).decryptKey(any());
     }
 
     public void testInitializationWithNewKey() throws Exception {

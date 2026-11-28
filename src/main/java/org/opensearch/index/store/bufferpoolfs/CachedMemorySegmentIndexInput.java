@@ -13,6 +13,7 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.nio.ByteOrder;
 import java.nio.file.Path;
+import java.util.Objects;
 
 import org.apache.lucene.store.AlreadyClosedException;
 import org.apache.lucene.store.IndexInput;
@@ -71,6 +72,7 @@ public class CachedMemorySegmentIndexInput extends IndexInput implements RandomA
     private int lastOffsetInBlock;
 
     private final BlockSlotTinyCache blockSlotTinyCache;
+    private final Runnable accessCheck;
 
     // Safe because IndexInput instances are not thread-safe per Lucene contract -
     // each thread must use its own clone().
@@ -97,6 +99,19 @@ public class CachedMemorySegmentIndexInput extends IndexInput implements RandomA
         ReadaheadContext readaheadContext,
         BlockSlotTinyCache blockSlotTinyCache
     ) {
+        return newInstance(resourceDescription, path, length, blockCache, readaheadManager, readaheadContext, blockSlotTinyCache, () -> {});
+    }
+
+    public static CachedMemorySegmentIndexInput newInstance(
+        String resourceDescription,
+        Path path,
+        long length,
+        BlockCache<RefCountedMemorySegment> blockCache,
+        ReadaheadManager readaheadManager,
+        ReadaheadContext readaheadContext,
+        BlockSlotTinyCache blockSlotTinyCache,
+        Runnable accessCheck
+    ) {
         CachedMemorySegmentIndexInput input = new CachedMemorySegmentIndexInput(
             resourceDescription,
             path,
@@ -106,7 +121,8 @@ public class CachedMemorySegmentIndexInput extends IndexInput implements RandomA
             readaheadManager,
             readaheadContext,
             false,
-            blockSlotTinyCache
+            blockSlotTinyCache,
+            accessCheck
         );
         try {
             input.seek(0L);
@@ -125,7 +141,8 @@ public class CachedMemorySegmentIndexInput extends IndexInput implements RandomA
         ReadaheadManager readaheadManager,
         ReadaheadContext readaheadContext,
         boolean isSlice,
-        BlockSlotTinyCache blockSlotTinyCache
+        BlockSlotTinyCache blockSlotTinyCache,
+        Runnable accessCheck
     ) {
         super(resourceDescription);
         this.path = path;
@@ -136,6 +153,7 @@ public class CachedMemorySegmentIndexInput extends IndexInput implements RandomA
         this.readaheadContext = readaheadContext;
         this.isSlice = isSlice;
         this.blockSlotTinyCache = blockSlotTinyCache;
+        this.accessCheck = Objects.requireNonNull(accessCheck);
     }
 
     void ensureOpen() {
@@ -167,6 +185,7 @@ public class CachedMemorySegmentIndexInput extends IndexInput implements RandomA
     * @throws IOException if the block cannot be acquired
     */
     private MemorySegment getCacheBlockWithOffset(long pos) throws IOException {
+        accessCheck.run();
         final long fileOffset = absoluteBaseOffset + pos;
         final long blockOffset = fileOffset & ~CACHE_BLOCK_MASK;
         lastOffsetInBlock = (int) (fileOffset - blockOffset);
@@ -759,7 +778,8 @@ public class CachedMemorySegmentIndexInput extends IndexInput implements RandomA
             readaheadManager,
             readaheadContext,
             true,
-            blockSlotTinyCache
+            blockSlotTinyCache,
+            accessCheck
         );
 
         try {

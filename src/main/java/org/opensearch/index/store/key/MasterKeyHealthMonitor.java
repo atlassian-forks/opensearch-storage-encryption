@@ -182,6 +182,9 @@ public class MasterKeyHealthMonitor {
      * @param failureType the type of failure (TRANSIENT or CRITICAL)
      */
     public void reportFailure(String indexUuid, String indexName, Exception exception, FailureType failureType) {
+        if (isPlaintextKeyRevoked(indexName)) {
+            return;
+        }
         FailureState state = failureTracker.get(indexUuid);
 
         if (state == null) {
@@ -219,6 +222,16 @@ public class MasterKeyHealthMonitor {
 
         if (state != null && state.blocksApplied && hasBlocks(indexName)) {
             removeBlocks(indexName);
+        }
+    }
+
+    // Deliberate key denial is a lifecycle state, not a KMS failure to repair with index blocks.
+    private boolean isPlaintextKeyRevoked(String indexName) {
+        try {
+            IndexMetadata index = clusterService.state().metadata().index(indexName);
+            return index != null && "revoked".equals(CryptoDirectoryFactory.INDEX_KEY_ACCESS_SETTING.get(index.getSettings()));
+        } catch (Exception e) {
+            return false;
         }
     }
 
@@ -437,8 +450,13 @@ public class MasterKeyHealthMonitor {
                     }
 
                     // Get index name from resolver
-                    String indexName = ((DefaultKeyResolver) resolver).getIndexName();
+                    DefaultKeyResolver defaultResolver = (DefaultKeyResolver) resolver;
+                    String indexName = defaultResolver.getIndexName();
                     if (indexName == null) {
+                        continue;
+                    }
+
+                    if (isPlaintextKeyRevoked(indexName)) {
                         continue;
                     }
 
@@ -457,7 +475,7 @@ public class MasterKeyHealthMonitor {
                             keyRecovered = true;
                         } else {
                             // Key not in cache (expired), try loading it from scratch
-                            NodeLevelKeyCache.getInstance().get(indexUuid, shardId, indexName);
+                            defaultResolver.getDataKey();
                             keyRecovered = true;
                         }
 
@@ -478,13 +496,15 @@ public class MasterKeyHealthMonitor {
                     }
 
                 } catch (Exception e) {
+                    KeyResolver resolver = ShardKeyResolverRegistry.getAnyResolverForIndex(indexUuid);
+                    String indexName = resolver != null ? ((DefaultKeyResolver) resolver).getIndexName() : indexUuid;
+                    // Revocation may have arrived while a key refresh was in flight.
+                    if (resolver != null && isPlaintextKeyRevoked(indexName)) {
+                        continue;
+                    }
                     // Key load failed for THIS index
                     // Classify the error to determine if blocks are needed
                     FailureType failureType = KeyCacheException.classify(e);
-
-                    // Get resolver and index name for further checks
-                    KeyResolver resolver = ShardKeyResolverRegistry.getAnyResolverForIndex(indexUuid);
-                    String indexName = resolver != null ? ((DefaultKeyResolver) resolver).getIndexName() : indexUuid;
 
                     // Check if key is still cached (not expired)
                     // We should only apply blocks if the cached key has expired or doesn't exist

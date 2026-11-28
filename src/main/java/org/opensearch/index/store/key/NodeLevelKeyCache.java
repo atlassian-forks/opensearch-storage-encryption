@@ -7,6 +7,7 @@ package org.opensearch.index.store.key;
 import java.security.Key;
 import java.util.Objects;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -44,6 +45,55 @@ public class NodeLevelKeyCache {
     private final LoadingCache<ShardCacheKey, Key> keyCache;
     private final long keyExpiryDuration;
     private final MasterKeyHealthMonitor healthMonitor;
+    private final ConcurrentHashMap<String, IndexKeyGate> indexGates = new ConcurrentHashMap<>();
+
+    static final class IndexKeyGate {
+        private volatile boolean revoked;
+        private long revision;
+    }
+
+    IndexKeyGate indexGate(String indexUuid) {
+        return indexGates.computeIfAbsent(indexUuid, ignored -> new IndexKeyGate());
+    }
+
+    /** Reports the local index revocation state without loading a plaintext key. */
+    public boolean isIndexRevoked(String indexUuid) {
+        IndexKeyGate gate = indexGates.get(indexUuid);
+        return gate != null && gate.revoked;
+    }
+
+    /** Captures the local key-access revision without loading a key or creating a gate. */
+    public IndexReadAccess captureIndexReadAccess(String indexUuid) {
+        IndexKeyGate gate = indexGates.get(indexUuid);
+        if (gate == null) {
+            return null;
+        }
+        synchronized (gate) {
+            return new IndexReadAccess(gate, gate.revision);
+        }
+    }
+
+    public static final class IndexReadAccess {
+        private final IndexKeyGate gate;
+        private final long revision;
+
+        private IndexReadAccess(IndexKeyGate gate, long revision) {
+            this.gate = gate;
+            this.revision = revision;
+        }
+
+        public boolean isCurrent() {
+            synchronized (gate) {
+                return !gate.revoked && gate.revision == revision;
+            }
+        }
+    }
+
+    static void requireKeyAccess(IndexKeyGate gate) {
+        if (gate.revoked) {
+            throw new SecurityException("Index key access is revoked");
+        }
+    }
 
     /**
      * Initializes the singleton instance with node-level settings and health monitor.
@@ -172,15 +222,31 @@ public class NodeLevelKeyCache {
         Objects.requireNonNull(indexUuid, "indexUuid cannot be null");
         Objects.requireNonNull(indexName, "indexName cannot be null");
 
+        return get(indexUuid, shardId, indexName, indexGate(indexUuid));
+    }
+
+    Key get(String indexUuid, int shardId, String indexName, IndexKeyGate gate) throws Exception {
+        ShardCacheKey cacheKey = new ShardCacheKey(indexUuid, shardId, indexName);
+        final long revision;
+        synchronized (gate) {
+            requireKeyAccess(gate);
+            revision = gate.revision;
+        }
         try {
-            return keyCache.get(new ShardCacheKey(indexUuid, shardId, indexName));
+            Key key = keyCache.get(cacheKey);
+            synchronized (gate) {
+                if (gate.revoked || gate.revision != revision) {
+                    keyCache.invalidate(cacheKey);
+                    throw new SecurityException("Index key access changed during key load");
+                }
+                return key;
+            }
         } catch (CompletionException e) {
             Throwable cause = e.getCause();
             if (cause instanceof Exception) {
                 throw (Exception) cause;
-            } else {
-                throw new RuntimeException("Failed to get key from cache", cause);
             }
+            throw new RuntimeException("Failed to get key from cache", cause);
         }
     }
 
@@ -196,6 +262,46 @@ public class NodeLevelKeyCache {
         Objects.requireNonNull(indexUuid, "indexUuid cannot be null");
         Objects.requireNonNull(indexName, "indexName cannot be null");
         keyCache.invalidate(new ShardCacheKey(indexUuid, shardId, indexName));
+    }
+
+    /** Denies subsequent local key loads and evicts cached keys for this index UUID. */
+    public void revokeIndex(String indexUuid) {
+        Objects.requireNonNull(indexUuid, "indexUuid cannot be null");
+        IndexKeyGate gate = indexGate(indexUuid);
+        synchronized (gate) {
+            if (!gate.revoked) {
+                gate.revoked = true;
+                gate.revision++;
+            }
+            keyCache.asMap().keySet().removeIf(key -> indexUuid.equals(key.getIndexUuid()));
+        }
+    }
+
+    /** Allows local key loads after an authorized restoration has been established. */
+    public void restoreIndex(String indexUuid) {
+        IndexKeyGate gate = indexGates.get(indexUuid);
+        if (gate == null) {
+            return;
+        }
+        synchronized (gate) {
+            if (gate.revoked) {
+                gate.revoked = false;
+                gate.revision++;
+            }
+        }
+    }
+
+    /** Retires an index after deletion. Existing resolvers and in-flight loads retain the denied gate. */
+    public void removeIndex(String indexUuid) {
+        IndexKeyGate gate = indexGates.get(indexUuid);
+        if (gate != null) {
+            synchronized (gate) {
+                gate.revoked = true;
+                gate.revision++;
+                indexGates.remove(indexUuid, gate);
+            }
+            keyCache.asMap().keySet().removeIf(key -> indexUuid.equals(key.getIndexUuid()));
+        }
     }
 
     /**
@@ -234,24 +340,30 @@ public class NodeLevelKeyCache {
         Objects.requireNonNull(indexUuid, "indexUuid cannot be null");
         Objects.requireNonNull(indexName, "indexName cannot be null");
 
+        IndexKeyGate gate = indexGates.get(indexUuid);
+        if (gate == null) {
+            return false;
+        }
         ShardCacheKey cacheKey = new ShardCacheKey(indexUuid, shardId, indexName);
-
-        // Only refresh if key exists in cache
+        final long revision;
+        synchronized (gate) {
+            requireKeyAccess(gate);
+            revision = gate.revision;
+        }
         if (keyCache.getIfPresent(cacheKey) == null) {
             return false;
         }
-
-        // Get resolver and load new key
         KeyResolver resolver = ShardKeyResolverRegistry.getResolver(indexUuid, shardId, indexName);
         if (resolver == null) {
             return false;
         }
-
         Key newKey = ((DefaultKeyResolver) resolver).loadKeyFromMasterKeyProvider();
-
-        // Update cache with new key
-        keyCache.put(cacheKey, newKey);
-
+        synchronized (gate) {
+            if (gate.revoked || gate.revision != revision) {
+                throw new SecurityException("Index key access changed during key refresh");
+            }
+            keyCache.put(cacheKey, newKey);
+        }
         healthMonitor.reportSuccess(indexUuid, indexName);
         return true;
     }

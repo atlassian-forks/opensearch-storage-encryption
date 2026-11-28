@@ -14,17 +14,14 @@ import java.nio.file.Path;
 import java.security.Provider;
 import java.security.Security;
 
-import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.FSLockFactory;
 import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.store.IndexOutput;
 import org.junit.After;
 import org.junit.Before;
-import org.opensearch.common.crypto.MasterKeyProvider;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.index.store.CryptoDirectoryFactory;
-import org.opensearch.index.store.DummyKeyProvider;
 import org.opensearch.index.store.PanamaNativeAccess;
 import org.opensearch.index.store.block_cache.BlockCache;
 import org.opensearch.index.store.block_cache.CaffeineBlockCache;
@@ -73,7 +70,6 @@ public class BlockLoaderCopyMismatchTests extends OpenSearchTestCase {
         CryptoDirectoryFactory.setNodeSettings(Settings.builder().put("node.store.crypto.write_cache_enabled", false).build());
         Path path = createTempDir();
         provider = Security.getProvider(DEFAULT_CRYPTO_PROVIDER);
-        MasterKeyProvider keyProvider = DummyKeyProvider.create();
 
         Settings nodeSettings = Settings
             .builder()
@@ -88,10 +84,9 @@ public class BlockLoaderCopyMismatchTests extends OpenSearchTestCase {
 
         String indexUuid = randomAlphaOfLength(10);
         String indexName = randomAlphaOfLength(10);
-        FSDirectory fsDirectory = FSDirectory.open(path);
         int shardId = 0;
 
-        KeyResolver keyResolver = new TestKeyResolver(indexUuid, indexName, fsDirectory, provider, keyProvider, shardId);
+        KeyResolver keyResolver = new TestKeyResolver();
         this.keyResolver = keyResolver;
 
         EncryptionMetadataCache encryptionMetadataCache = EncryptionMetadataCacheRegistry.getOrCreateCache(indexUuid, shardId, indexName);

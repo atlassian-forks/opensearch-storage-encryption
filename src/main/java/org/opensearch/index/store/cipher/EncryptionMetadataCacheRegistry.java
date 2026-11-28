@@ -4,6 +4,7 @@
  */
 package org.opensearch.index.store.cipher;
 
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -39,6 +40,16 @@ public class EncryptionMetadataCacheRegistry {
     public static EncryptionMetadataCache getOrCreateCache(String indexUuid, int shardId, String indexName) {
         ShardCacheKey key = new ShardCacheKey(indexUuid, shardId, indexName);
         return cacheRegistry.computeIfAbsent(key, k -> new EncryptionMetadataCache());
+    }
+
+    /** Clears derived-key metadata for every local shard of one physical index. */
+    public static void invalidateIndex(String indexUuid) {
+        Objects.requireNonNull(indexUuid, "indexUuid cannot be null");
+        cacheRegistry.forEach((key, cache) -> {
+            if (indexUuid.equals(key.getIndexUuid())) {
+                cache.invalidateDirectory();
+            }
+        });
     }
 
     /**
